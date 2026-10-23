@@ -1,0 +1,72 @@
+export type OrgNodeStatus = 'ACTIVE' | 'INACTIVE' | 'ARCHIVED';
+export interface IOrgNodeProps {
+    projectId: string;
+    nodeId: string;
+    name: string;
+    type: string;
+    parentId?: string | null;
+    path?: string;
+    depth?: number;
+    displayOrder?: number;
+    status?: OrgNodeStatus;
+    attributes?: Record<string, any>;
+    version?: number;
+    isDeleted?: boolean;
+    createdAt?: Date;
+    updatedAt?: Date;
+}
+export declare class OrgNodeEntity {
+    static NODE_ID_REGEX: RegExp;
+    static PATH_REGEX: RegExp;
+    readonly projectId: string;
+    readonly nodeId: string;
+    private _name;
+    private _type;
+    private _parentId;
+    private _path;
+    private _depth;
+    private _displayOrder;
+    private _status;
+    private _attributes;
+    private _version;
+    private _isDeleted;
+    readonly createdAt: Date;
+    private _updatedAt;
+    constructor(props: IOrgNodeProps);
+    get name(): string;
+    get type(): string;
+    get parentId(): string | null;
+    get path(): string;
+    get depth(): number;
+    get displayOrder(): number;
+    get status(): OrgNodeStatus;
+    get attributes(): Record<string, any>;
+    get version(): number;
+    get isDeleted(): boolean;
+    get updatedAt(): Date;
+    updateDetails(params: {
+        name?: string;
+        type?: string;
+        displayOrder?: number;
+        attributes?: Record<string, any>;
+    }): void;
+    setPathAndParent(newParentId: string | null, parentPath?: string): void;
+    setStatus(newStatus: OrgNodeStatus): void;
+    markAsDeleted(): void;
+    toJSON(): {
+        projectId: string;
+        nodeId: string;
+        name: string;
+        type: string;
+        parentId: string | null;
+        path: string;
+        depth: number;
+        displayOrder: number;
+        status: OrgNodeStatus;
+        attributes: Record<string, any>;
+        version: number;
+        isDeleted: boolean;
+        createdAt: Date;
+        updatedAt: Date;
+    };
+}

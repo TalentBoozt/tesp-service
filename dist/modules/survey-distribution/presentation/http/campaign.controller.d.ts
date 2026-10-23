@@ -1,0 +1,35 @@
+import { Request, Response, NextFunction } from 'express';
+import { LaunchCampaignUseCase } from '../../application/use-cases/launch-campaign.use-case';
+import { GetCampaignMetricsUseCase } from '../../application/use-cases/get-campaign-metrics.use-case';
+import { ListCampaignsUseCase } from '../../application/use-cases/list-campaigns.use-case';
+import { DispatchRemindersUseCase } from '../../application/use-cases/dispatch-reminders.use-case';
+import { ValidateAndBurnTokenUseCase } from '../../application/use-cases/validate-and-burn-token.use-case';
+import { HandleDeliveryWebhookUseCase } from '../../application/use-cases/handle-delivery-webhook.use-case';
+import { GetOptimalDispatchTimeUseCase } from '../../application/use-cases/get-optimal-dispatch-time.use-case';
+import { GenerateKioskPinsUseCase } from '../../application/use-cases/generate-kiosk-pins.use-case';
+import { GetCampaignKioskRosterUseCase } from '../../application/use-cases/get-campaign-kiosk-roster.use-case';
+import { GetMySurveysUseCase } from '../../application/use-cases/get-my-surveys.use-case';
+export declare class CampaignController {
+    private launchCampaignUseCase;
+    private getCampaignMetricsUseCase;
+    private listCampaignsUseCase;
+    private dispatchRemindersUseCase;
+    private validateAndBurnTokenUseCase;
+    private handleDeliveryWebhookUseCase;
+    private getOptimalDispatchTimeUseCase;
+    private generateKioskPinsUseCase?;
+    private getCampaignKioskRosterUseCase?;
+    private getMySurveysUseCase?;
+    constructor(launchCampaignUseCase: LaunchCampaignUseCase, getCampaignMetricsUseCase: GetCampaignMetricsUseCase, listCampaignsUseCase: ListCampaignsUseCase, dispatchRemindersUseCase: DispatchRemindersUseCase, validateAndBurnTokenUseCase: ValidateAndBurnTokenUseCase, handleDeliveryWebhookUseCase: HandleDeliveryWebhookUseCase, getOptimalDispatchTimeUseCase: GetOptimalDispatchTimeUseCase, generateKioskPinsUseCase?: GenerateKioskPinsUseCase | undefined, getCampaignKioskRosterUseCase?: GetCampaignKioskRosterUseCase | undefined, getMySurveysUseCase?: GetMySurveysUseCase | undefined);
+    launchCampaign: (req: Request, res: Response, next: NextFunction) => Promise<void>;
+    getCampaignMetrics: (req: Request, res: Response, next: NextFunction) => Promise<void>;
+    listCampaigns: (req: Request, res: Response, next: NextFunction) => Promise<void>;
+    dispatchReminders: (req: Request, res: Response, next: NextFunction) => Promise<void>;
+    generateKioskPins: (req: Request, res: Response, next: NextFunction) => Promise<void>;
+    validateTokenOnly: (req: Request, res: Response, next: NextFunction) => Promise<void>;
+    validateAndBurnToken: (req: Request, res: Response, next: NextFunction) => Promise<void>;
+    handleWebhook: (req: Request, res: Response, next: NextFunction) => Promise<void>;
+    getOptimalDispatchTime: (req: Request, res: Response, next: NextFunction) => Promise<void>;
+    getKioskRoster: (req: Request, res: Response, next: NextFunction) => Promise<void>;
+    getMySurveys: (req: Request, res: Response, next: NextFunction) => Promise<void>;
+}

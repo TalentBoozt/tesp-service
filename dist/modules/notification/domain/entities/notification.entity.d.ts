@@ -1,0 +1,50 @@
+import { UserRole } from '../../../../shared/presentation/middleware/auth.middleware';
+export type NotificationCategory = 'CAMPAIGN' | 'AI_ANOMALY' | 'REPORT' | 'HRIS' | 'COMPLIANCE';
+export type NotificationSeverity = 'INFO' | 'SUCCESS' | 'WARNING' | 'CRITICAL';
+export interface INotificationProps {
+    notificationId: string;
+    projectId: string;
+    recipientUserId?: string;
+    recipientRole?: UserRole;
+    category: NotificationCategory;
+    severity: NotificationSeverity;
+    title: string;
+    message: string;
+    actionUrl?: string;
+    metadata?: Record<string, any>;
+    isRead?: boolean;
+    readAt?: Date | null;
+    emailDispatched?: boolean;
+    emailDispatchedAt?: Date | null;
+    createdAt?: Date;
+}
+export declare class NotificationEntity {
+    static NOTIFICATION_ID_REGEX: RegExp;
+    readonly notificationId: string;
+    readonly projectId: string;
+    readonly recipientUserId?: string;
+    readonly recipientRole?: UserRole;
+    readonly category: NotificationCategory;
+    readonly severity: NotificationSeverity;
+    private _title;
+    private _message;
+    readonly actionUrl?: string;
+    readonly metadata?: Record<string, any>;
+    private _isRead;
+    private _readAt?;
+    private _emailDispatched;
+    private _emailDispatchedAt?;
+    readonly createdAt: Date;
+    constructor(props: INotificationProps);
+    get title(): string;
+    get message(): string;
+    get isRead(): boolean;
+    get readAt(): Date | null | undefined;
+    get emailDispatched(): boolean;
+    get emailDispatchedAt(): Date | null | undefined;
+    markAsRead(): void;
+    markAsUnread(): void;
+    setEmailDispatched(): void;
+    matchesRecipient(userId?: string, role?: UserRole): boolean;
+    toJSON(): INotificationProps;
+}

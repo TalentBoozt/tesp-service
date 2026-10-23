@@ -1,0 +1,33 @@
+import { Request, Response, NextFunction } from 'express';
+import { CreateEmployeeUseCase } from '../../application/use-cases/create-employee.use-case';
+import { UpdateEmployeeUseCase } from '../../application/use-cases/update-employee.use-case';
+import { BulkImportEmployeesUseCase } from '../../application/use-cases/bulk-import-employees.use-case';
+import { GetEmployeeUseCase } from '../../application/use-cases/get-employee.use-case';
+import { GetDemographicSnapshotUseCase } from '../../application/use-cases/get-demographic-snapshot.use-case';
+import { ListEmployeesUseCase } from '../../application/use-cases/list-employees.use-case';
+import { TerminateEmployeeUseCase } from '../../application/use-cases/terminate-employee.use-case';
+import { GetEmployeeSurveyHistoryUseCase } from '../../application/use-cases/get-employee-survey-history.use-case';
+import { ManageHrisConfigUseCase } from '../../application/use-cases/manage-hris-config.use-case';
+export declare class EmployeeController {
+    private createEmployeeUseCase;
+    private updateEmployeeUseCase;
+    private bulkImportEmployeesUseCase;
+    private getEmployeeUseCase;
+    private getDemographicSnapshotUseCase;
+    private listEmployeesUseCase;
+    private terminateEmployeeUseCase;
+    private getEmployeeSurveyHistoryUseCase?;
+    private manageHrisConfigUseCase?;
+    constructor(createEmployeeUseCase: CreateEmployeeUseCase, updateEmployeeUseCase: UpdateEmployeeUseCase, bulkImportEmployeesUseCase: BulkImportEmployeesUseCase, getEmployeeUseCase: GetEmployeeUseCase, getDemographicSnapshotUseCase: GetDemographicSnapshotUseCase, listEmployeesUseCase: ListEmployeesUseCase, terminateEmployeeUseCase: TerminateEmployeeUseCase, getEmployeeSurveyHistoryUseCase?: GetEmployeeSurveyHistoryUseCase | undefined, manageHrisConfigUseCase?: ManageHrisConfigUseCase | undefined);
+    createEmployee: (req: Request, res: Response, next: NextFunction) => Promise<void>;
+    updateEmployee: (req: Request, res: Response, next: NextFunction) => Promise<void>;
+    bulkImport: (req: Request, res: Response, next: NextFunction) => Promise<void>;
+    getEmployee: (req: Request, res: Response, next: NextFunction) => Promise<void>;
+    getDemographicSnapshot: (req: Request, res: Response, next: NextFunction) => Promise<void>;
+    listEmployees: (req: Request, res: Response, next: NextFunction) => Promise<void>;
+    terminateEmployee: (req: Request, res: Response, next: NextFunction) => Promise<void>;
+    getSurveyHistory: (req: Request, res: Response, next: NextFunction) => Promise<void>;
+    getHrisConfig: (req: Request, res: Response, next: NextFunction) => Promise<void>;
+    updateHrisConfig: (req: Request, res: Response, next: NextFunction) => Promise<void>;
+    syncHris: (req: Request, res: Response, next: NextFunction) => Promise<void>;
+}
