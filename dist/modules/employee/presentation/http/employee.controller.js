@@ -5,6 +5,7 @@ const get_employee_survey_history_use_case_1 = require("../../application/use-ca
 const manage_hris_config_use_case_1 = require("../../application/use-cases/manage-hris-config.use-case");
 const employee_dto_1 = require("../dto/employee.dto");
 const error_middleware_1 = require("../../../../shared/presentation/middleware/error.middleware");
+const tenant_context_1 = require("../../../../shared/presentation/utils/tenant-context");
 class EmployeeController {
     createEmployeeUseCase;
     updateEmployeeUseCase;
@@ -28,7 +29,15 @@ class EmployeeController {
     }
     createEmployee = async (req, res, next) => {
         try {
-            const parsed = employee_dto_1.CreateEmployeeSchema.safeParse(req.body);
+            const incoming = req.body || {};
+            const tenantProjectId = (0, tenant_context_1.resolveTenantProjectId)(req, incoming.projectId);
+            const payload = {
+                ...incoming,
+                projectId: (incoming.projectId && incoming.projectId.trim().length > 0)
+                    ? incoming.projectId.trim()
+                    : tenantProjectId,
+            };
+            const parsed = employee_dto_1.CreateEmployeeSchema.safeParse(payload);
             if (!parsed.success) {
                 const detail = parsed.error.errors.map((e) => e.message).join('; ');
                 throw new error_middleware_1.AppError(400, detail, 'https://tesp-api.talnova.io/errors/validation-failed');
@@ -48,10 +57,7 @@ class EmployeeController {
     updateEmployee = async (req, res, next) => {
         try {
             const { employeeId } = req.params;
-            const projectId = req.query.projectId || req.body.projectId || req.user?.projectId;
-            if (!projectId) {
-                throw new error_middleware_1.AppError(400, 'projectId query parameter is required');
-            }
+            const projectId = (0, tenant_context_1.resolveTenantProjectId)(req, req.body?.projectId);
             const parsed = employee_dto_1.UpdateEmployeeSchema.safeParse(req.body);
             if (!parsed.success) {
                 const detail = parsed.error.errors.map((e) => e.message).join('; ');
@@ -67,10 +73,7 @@ class EmployeeController {
     };
     bulkImport = async (req, res, next) => {
         try {
-            const projectId = req.headers['x-project-id'] || req.query.projectId || req.body.projectId || req.user?.projectId;
-            if (!projectId) {
-                throw new error_middleware_1.AppError(400, 'X-Project-ID header or projectId parameter is required');
-            }
+            const projectId = (0, tenant_context_1.resolveTenantProjectId)(req, req.body?.projectId);
             const parsed = employee_dto_1.BulkImportSchema.safeParse(req.body);
             if (!parsed.success) {
                 const detail = parsed.error.errors.map((e) => e.message).join('; ');
@@ -98,10 +101,7 @@ class EmployeeController {
     getEmployee = async (req, res, next) => {
         try {
             const { employeeId } = req.params;
-            const projectId = req.query.projectId || req.user?.projectId;
-            if (!projectId) {
-                throw new error_middleware_1.AppError(400, 'projectId query parameter is required');
-            }
+            const projectId = (0, tenant_context_1.resolveTenantProjectId)(req);
             const employee = await this.getEmployeeUseCase.execute(projectId, employeeId);
             res.status(200).json({ data: employee.toJSON() });
         }
@@ -112,10 +112,7 @@ class EmployeeController {
     getDemographicSnapshot = async (req, res, next) => {
         try {
             const { employeeId } = req.params;
-            const projectId = req.query.projectId || req.user?.projectId;
-            if (!projectId) {
-                throw new error_middleware_1.AppError(400, 'projectId query parameter is required');
-            }
+            const projectId = (0, tenant_context_1.resolveTenantProjectId)(req);
             const snapshot = await this.getDemographicSnapshotUseCase.execute(projectId, employeeId);
             res.status(200).json({ data: snapshot });
         }
@@ -125,10 +122,7 @@ class EmployeeController {
     };
     listEmployees = async (req, res, next) => {
         try {
-            const projectId = req.query.projectId ||
-                req.user?.projectId ||
-                req.headers['x-project-id'] ||
-                'PRJ-99201';
+            const projectId = (0, tenant_context_1.resolveTenantProjectId)(req);
             const page = req.query.page ? parseInt(req.query.page, 10) : 1;
             const limit = req.query.limit ? parseInt(req.query.limit, 10) : 20;
             const nodeId = req.query.nodeId;
@@ -152,10 +146,7 @@ class EmployeeController {
     terminateEmployee = async (req, res, next) => {
         try {
             const { employeeId } = req.params;
-            const projectId = req.query.projectId || req.user?.projectId;
-            if (!projectId) {
-                throw new error_middleware_1.AppError(400, 'projectId query parameter is required');
-            }
+            const projectId = (0, tenant_context_1.resolveTenantProjectId)(req);
             const actorContext = req.user ? { actorId: req.user.userId, actorRole: req.user.role } : undefined;
             await this.terminateEmployeeUseCase.execute(projectId, employeeId, actorContext);
             res.status(204).send();
@@ -167,7 +158,25 @@ class EmployeeController {
     getSurveyHistory = async (req, res, next) => {
         try {
             const { employeeId } = req.params;
-            const projectId = req.query.projectId || req.user?.projectId || 'PRJ-99201';
+            const projectId = (0, tenant_context_1.resolveTenantProjectId)(req);
+            if (!this.getEmployeeSurveyHistoryUseCase) {
+                this.getEmployeeSurveyHistoryUseCase = new get_employee_survey_history_use_case_1.GetEmployeeSurveyHistoryUseCase();
+            }
+            const history = await this.getEmployeeSurveyHistoryUseCase.execute(projectId, employeeId);
+            res.status(200).json(history);
+        }
+        catch (err) {
+            next(err);
+        }
+    };
+    getMySurveys = async (req, res, next) => {
+        try {
+            const employeeId = req.user?.employeeId || req.user?.userId;
+            const projectId = (0, tenant_context_1.resolveTenantProjectId)(req);
+            if (!employeeId) {
+                res.status(200).json([]);
+                return;
+            }
             if (!this.getEmployeeSurveyHistoryUseCase) {
                 this.getEmployeeSurveyHistoryUseCase = new get_employee_survey_history_use_case_1.GetEmployeeSurveyHistoryUseCase();
             }
@@ -180,7 +189,7 @@ class EmployeeController {
     };
     getHrisConfig = async (req, res, next) => {
         try {
-            const projectId = req.query.projectId || req.user?.projectId || 'PRJ-99201';
+            const projectId = (0, tenant_context_1.resolveTenantProjectId)(req);
             if (!this.manageHrisConfigUseCase) {
                 this.manageHrisConfigUseCase = new manage_hris_config_use_case_1.ManageHrisConfigUseCase();
             }
@@ -193,7 +202,7 @@ class EmployeeController {
     };
     updateHrisConfig = async (req, res, next) => {
         try {
-            const projectId = req.query.projectId || req.body.projectId || req.user?.projectId || 'PRJ-99201';
+            const projectId = (0, tenant_context_1.resolveTenantProjectId)(req);
             if (!this.manageHrisConfigUseCase) {
                 this.manageHrisConfigUseCase = new manage_hris_config_use_case_1.ManageHrisConfigUseCase();
             }
@@ -206,7 +215,7 @@ class EmployeeController {
     };
     syncHris = async (req, res, next) => {
         try {
-            const projectId = req.query.projectId || req.body.projectId || req.user?.projectId || 'PRJ-99201';
+            const projectId = (0, tenant_context_1.resolveTenantProjectId)(req);
             if (!this.manageHrisConfigUseCase) {
                 this.manageHrisConfigUseCase = new manage_hris_config_use_case_1.ManageHrisConfigUseCase();
             }

@@ -11,6 +11,7 @@ export declare class AnalyticsController {
     private getKeyDriversUseCase;
     private getDashboardOverviewUseCase;
     constructor(getDashboardMetricsUseCase: GetDashboardMetricsUseCase, getHeatmapMatrixUseCase: GetHeatmapMatrixUseCase, freezeAnalyticalSnapshotUseCase: FreezeAnalyticalSnapshotUseCase, getKeyDriversUseCase: GetKeyDriversUseCase, getDashboardOverviewUseCase?: GetDashboardOverviewUseCase);
+    private enforceTenantAccess;
     getOverview: (req: Request, res: Response, next: NextFunction) => Promise<void>;
     getDashboard: (req: Request, res: Response, next: NextFunction) => Promise<void>;
     getHeatmap: (req: Request, res: Response, next: NextFunction) => Promise<void>;

@@ -78,7 +78,6 @@ const UserSchema = new mongoose_1.Schema({
     primaryProjectId: {
         type: String,
         required: true,
-        default: 'PRJ-99201',
         index: true,
     },
     employeeId: {

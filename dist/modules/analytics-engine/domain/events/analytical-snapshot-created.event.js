@@ -2,13 +2,20 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.AnalyticalSnapshotCreatedEvent = void 0;
 class AnalyticalSnapshotCreatedEvent {
+    eventId;
+    eventType = 'ANALYTICAL_SNAPSHOT_CREATED';
+    aggregateId;
+    timestamp;
     payload;
     constructor(payload) {
+        this.eventId = `EVT-${Math.floor(10000000 + Math.random() * 90000000)}`;
+        this.aggregateId = payload.snapshotId;
+        this.timestamp = new Date();
         this.payload = {
             ...payload,
-            eventId: `EVT-${Math.floor(10000000 + Math.random() * 90000000)}`,
+            eventId: this.eventId,
             eventType: 'ANALYTICAL_SNAPSHOT_CREATED',
-            timestamp: new Date().toISOString(),
+            timestamp: this.timestamp.toISOString(),
         };
     }
 }

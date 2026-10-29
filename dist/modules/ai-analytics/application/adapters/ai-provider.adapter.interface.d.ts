@@ -4,6 +4,8 @@ export interface AiInferenceResult {
     sentimentLabel: SentimentLabel;
     confidence: number;
     themes: string[];
+    isAiSimulated?: boolean;
+    fallbackReason?: string;
 }
 export interface IAiProviderAdapter {
     analyzeText(sanitizedText: string): Promise<AiInferenceResult>;

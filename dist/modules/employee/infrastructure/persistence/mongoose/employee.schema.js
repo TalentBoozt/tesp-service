@@ -35,6 +35,7 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.EmployeeModel = void 0;
 const mongoose_1 = __importStar(require("mongoose"));
+const field_encryption_service_1 = require("../../../../../shared/infrastructure/security/field-encryption.service");
 const EmployeeSchema = new mongoose_1.Schema({
     projectId: { type: String, required: true, index: true },
     employeeId: {
@@ -47,10 +48,10 @@ const EmployeeSchema = new mongoose_1.Schema({
     email: {
         type: String,
         required: false,
-        validate: {
-            validator: (v) => !v || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v),
-            message: 'Invalid email address format',
-        },
+    },
+    emailBlindIndex: {
+        type: String,
+        index: true,
     },
     fullName: { type: String, required: true },
     phoneNumber: { type: String },
@@ -66,11 +67,39 @@ const EmployeeSchema = new mongoose_1.Schema({
     collection: 'employees',
     timestamps: true,
 });
+// Pre-save document middleware to encrypt sensitive PII attributes
+EmployeeSchema.pre('save', function (next) {
+    if (this.isModified('email') && this.email) {
+        this.emailBlindIndex = field_encryption_service_1.FieldEncryptionService.blindIndex(this.email);
+        this.email = field_encryption_service_1.FieldEncryptionService.encrypt(this.email);
+    }
+    if (this.isModified('fullName') && this.fullName) {
+        this.fullName = field_encryption_service_1.FieldEncryptionService.encrypt(this.fullName);
+    }
+    if (this.isModified('phoneNumber') && this.phoneNumber) {
+        this.phoneNumber = field_encryption_service_1.FieldEncryptionService.encrypt(this.phoneNumber);
+    }
+    next();
+});
+// Post-init document middleware to transparently decrypt PII attributes on read
+EmployeeSchema.post('init', function (doc) {
+    if (doc.email) {
+        doc.email = field_encryption_service_1.FieldEncryptionService.decrypt(doc.email);
+    }
+    if (doc.fullName) {
+        doc.fullName = field_encryption_service_1.FieldEncryptionService.decrypt(doc.fullName);
+    }
+    if (doc.phoneNumber) {
+        doc.phoneNumber = field_encryption_service_1.FieldEncryptionService.decrypt(doc.phoneNumber);
+    }
+});
 // Compound Unique Index: Unique employeeId per project workspace
 EmployeeSchema.index({ projectId: 1, employeeId: 1 }, { unique: true });
 // Compound Search Index: Search by project, nodeId, and status
 EmployeeSchema.index({ projectId: 1, nodeId: 1, status: 1, isDeleted: 1 });
 // Multikey Index for Matrix Node assignments
 EmployeeSchema.index({ projectId: 1, matrixNodeIds: 1 });
+// Blind Index for deterministic email lookups
+EmployeeSchema.index({ projectId: 1, emailBlindIndex: 1 });
 exports.EmployeeModel = mongoose_1.default.model('Employee', EmployeeSchema);
 //# sourceMappingURL=employee.schema.js.map

@@ -82,6 +82,7 @@ export declare class CampaignEntity {
     pause(): void;
     resume(): void;
     cancel(): void;
+    forceComplete(): void;
     checkExpiration(now?: Date): void;
     incrementMetric(type: keyof CampaignMetrics, count?: number): void;
     toJSON(): CampaignProps;

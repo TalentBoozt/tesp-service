@@ -4,7 +4,6 @@ exports.GetEmployeeSurveyHistoryUseCase = void 0;
 const employee_schema_1 = require("../../infrastructure/persistence/mongoose/employee.schema");
 const token_vault_schema_1 = require("../../../survey-distribution/infrastructure/persistence/mongoose/token-vault.schema");
 const campaign_schema_1 = require("../../../survey-distribution/infrastructure/persistence/mongoose/campaign.schema");
-const survey_response_schema_1 = require("../../../response-intake/infrastructure/persistence/mongoose/survey-response.schema");
 class GetEmployeeSurveyHistoryUseCase {
     async execute(projectId, employeeId) {
         // 1. Resolve employee
@@ -62,17 +61,21 @@ class GetEmployeeSurveyHistoryUseCase {
                     targetNodes.includes('GLOBAL') ||
                     targetNodes.includes(employee.nodeId);
                 if (isTargeted) {
-                    // Check if response exists for this campaign & node
-                    const responseExists = await survey_response_schema_1.SurveyResponseModel.findOne({
+                    // Check if a participant token was allocated to this specific employee (GAP-014 / TASK-012)
+                    const employeeToken = await token_vault_schema_1.TokenVaultModel.findOne({
                         projectId,
                         campaignId: campaign.campaignId,
-                        nodeId: employee.nodeId,
+                        $or: [
+                            { employeeId: employee.employeeId },
+                            { employeeId: employee._id ? employee._id.toString() : undefined },
+                        ],
                     }).lean();
+                    const isCompleted = employeeToken ? employeeToken.isBurned : false;
                     result.push({
                         id: `hist-${campaign.campaignId}-${employee.employeeId}`,
                         campaignId: campaign.campaignId,
                         title: campaign.title,
-                        status: responseExists ? 'COMPLETED' : 'PENDING',
+                        status: isCompleted ? 'COMPLETED' : 'PENDING',
                         date: campaign.startDate
                             ? campaign.startDate.toISOString().split('T')[0]
                             : new Date().toISOString().split('T')[0],

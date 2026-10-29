@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.QuestionLibrarySchema = exports.SaveSurveyDraftSchema = exports.PageSchema = exports.SectionSchema = exports.QuestionSchema = exports.QuestionOptionSchema = exports.BranchingLogicRuleSchema = void 0;
+exports.InstantiateSurveyTemplateSchema = exports.QuestionLibrarySchema = exports.SaveSurveyDraftSchema = exports.PageSchema = exports.SectionSchema = exports.QuestionSchema = exports.QuestionOptionSchema = exports.BranchingLogicRuleSchema = void 0;
 const zod_1 = require("zod");
 exports.BranchingLogicRuleSchema = zod_1.z.object({
     ruleId: zod_1.z.string().min(1, 'ruleId is required'),
@@ -52,7 +52,7 @@ exports.PageSchema = zod_1.z.object({
 });
 exports.SaveSurveyDraftSchema = zod_1.z.object({
     projectId: zod_1.z.string().min(1, 'projectId is required'),
-    surveyId: zod_1.z.string().regex(/^SRV-[A-Za-z0-9_-]{3,20}$/, 'Invalid Survey ID format. Expected format: ^SRV-[A-Za-z0-9_-]{3,20}$ (e.g. SRV-5001)'),
+    surveyId: zod_1.z.string().regex(/^SRV-[A-Za-z0-9_-]{3,50}$/, 'Invalid Survey ID format. Expected format: ^SRV-[A-Za-z0-9_-]{3,50}$ (e.g. SRV-5001)'),
     version: zod_1.z.number().int().optional(),
     title: zod_1.z.record(zod_1.z.string()).refine((val) => Object.keys(val).length > 0, 'Survey title is required and must contain at least 1 locale string'),
     description: zod_1.z.record(zod_1.z.string()).optional(),
@@ -77,5 +77,16 @@ exports.QuestionLibrarySchema = zod_1.z.object({
     ]),
     prompt: zod_1.z.record(zod_1.z.string()).refine((val) => Object.keys(val).length > 0, 'Prompt dictionary is required'),
     options: zod_1.z.array(exports.QuestionOptionSchema).optional(),
+});
+exports.InstantiateSurveyTemplateSchema = zod_1.z.object({
+    projectId: zod_1.z.string().min(1, 'projectId is required'),
+    templateId: zod_1.z.string().min(1, 'templateId is required'),
+    surveyId: zod_1.z.string().regex(/^SRV-[A-Za-z0-9_-]{3,50}$/, 'Invalid Survey ID format. Expected format: ^SRV-[A-Za-z0-9_-]{3,50}$ (e.g. SRV-5001)'),
+    title: zod_1.z.union([
+        zod_1.z.string().min(1, 'title cannot be empty'),
+        zod_1.z.record(zod_1.z.string()).refine((val) => Object.keys(val).length > 0, 'title must contain at least 1 locale string'),
+    ]),
+    description: zod_1.z.union([zod_1.z.string(), zod_1.z.record(zod_1.z.string())]).optional(),
+    anonymous: zod_1.z.boolean().optional(),
 });
 //# sourceMappingURL=survey.dto.js.map

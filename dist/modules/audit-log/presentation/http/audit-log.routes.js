@@ -4,6 +4,7 @@ exports.createAuditLogRouter = createAuditLogRouter;
 const express_1 = require("express");
 const audit_log_service_1 = require("../../application/services/audit-log.service");
 const auth_middleware_1 = require("../../../../shared/presentation/middleware/auth.middleware");
+const tenant_context_1 = require("../../../../shared/presentation/utils/tenant-context");
 function createAuditLogRouter(service) {
     const router = (0, express_1.Router)();
     const auditLogService = service || audit_log_service_1.AuditLogService.getInstance();
@@ -19,7 +20,7 @@ function createAuditLogRouter(service) {
             // If not SUPER_ADMIN, scope to user's assigned project
             let projectId = user.projectId;
             if (user.role === auth_middleware_1.UserRole.SUPER_ADMIN) {
-                projectId = requestedProjectId || user.projectId || 'PRJ-99201';
+                projectId = requestedProjectId || user.projectId || (req.query.allProjects === 'true' ? 'ALL' : (0, tenant_context_1.resolveTenantProjectId)(req));
             }
             else if (requestedProjectId && requestedProjectId !== user.projectId) {
                 projectId = user.projectId; // Tenant isolation enforcement
@@ -58,7 +59,7 @@ function createAuditLogRouter(service) {
                 });
             }
             const doc = await auditLogService.recordAuditLog({
-                projectId: user.projectId || 'PRJ-99201',
+                projectId: (0, tenant_context_1.resolveTenantProjectId)(req),
                 actorId: user.userId,
                 actorRole: user.role,
                 action,

@@ -49,8 +49,12 @@ exports.authRateLimiter = (0, express_rate_limit_1.default)({
         if (process.env.NODE_ENV === 'test' && !req.headers['x-test-rate-limit']) {
             return true;
         }
-        const userAgent = req.headers['user-agent'] || '';
-        if (userAgent.includes('TESP-SmokeTest')) {
+        const bypassKey = process.env.SMOKE_TEST_BYPASS_KEY;
+        const providedKey = (req.headers['x-smoke-test-key'] || req.headers['x-bypass-ratelimit']);
+        if (process.env.NODE_ENV !== 'production' &&
+            bypassKey &&
+            providedKey &&
+            providedKey === bypassKey) {
             return true;
         }
         return false;

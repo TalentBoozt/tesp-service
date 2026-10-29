@@ -50,12 +50,25 @@ class ReportJobMongoRepository {
             return null;
         return this.toEntity(doc);
     }
+    async findByJobIdOnly(jobId) {
+        const doc = await report_job_schema_1.ReportJobModel.findOne({ jobId });
+        if (!doc)
+            return null;
+        return this.toEntity(doc);
+    }
     async findAllByProject(projectId, requestedBy) {
         const query = { projectId };
         if (requestedBy)
             query.requestedBy = requestedBy;
         const docs = await report_job_schema_1.ReportJobModel.find(query).sort({ createdAt: -1 });
         return docs.map((doc) => this.toEntity(doc));
+    }
+    async deleteJob(jobId, projectId) {
+        const query = { jobId };
+        if (projectId)
+            query.projectId = projectId;
+        const res = await report_job_schema_1.ReportJobModel.deleteOne(query);
+        return (res.deletedCount || 0) > 0;
     }
 }
 exports.ReportJobMongoRepository = ReportJobMongoRepository;

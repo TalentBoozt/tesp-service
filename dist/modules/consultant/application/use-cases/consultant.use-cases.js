@@ -2,6 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.SignoffAiFindingUseCase = exports.GetSignoffQueueUseCase = exports.ListWorkshopsUseCase = exports.CreateWorkshopUseCase = exports.GetBenchmarksUseCase = exports.ListEngagementsUseCase = void 0;
 const error_middleware_1 = require("../../../../shared/presentation/middleware/error.middleware");
+const tenant_context_required_error_1 = require("../../../../shared/domain/errors/tenant-context-required.error");
 class ListEngagementsUseCase {
     consultantRepo;
     constructor(consultantRepo) {
@@ -35,11 +36,14 @@ class CreateWorkshopUseCase {
         if (!dto.clientName) {
             throw new error_middleware_1.AppError(400, 'Client name is required');
         }
+        if (!dto.projectId) {
+            throw new tenant_context_required_error_1.TenantContextRequiredError('Project ID is required to create an executive workshop');
+        }
         return await this.consultantRepo.createWorkshop({
-            projectId: dto.projectId || 'PRJ-99201',
+            projectId: dto.projectId,
             title: dto.title,
             clientName: dto.clientName,
-            consultantLead: dto.consultantLead || 'Dr. Samantha Perera (Daash Global)',
+            consultantLead: dto.consultantLead || 'Lead Consultant',
             scheduledDate: dto.scheduledDate || new Date().toISOString().split('T')[0],
             status: dto.status || 'READY_FOR_EXEC',
             keyThemes: dto.keyThemes || [],

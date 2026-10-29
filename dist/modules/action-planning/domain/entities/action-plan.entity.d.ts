@@ -1,16 +1,20 @@
-export type ActionPlanStatus = 'DRAFT' | 'PROPOSED' | 'APPROVED' | 'REJECTED' | 'IN_PROGRESS' | 'COMPLETED' | 'VERIFIED' | 'CANCELLED';
+export type ActionPlanStatus = 'DRAFT' | 'PROPOSED' | 'APPROVED' | 'REJECTED' | 'IN_PROGRESS' | 'ACTIVE' | 'COMPLETED' | 'VERIFIED' | 'CANCELLED';
 export type MilestoneStatus = 'PENDING' | 'IN_PROGRESS' | 'COMPLETED';
+export type MilestoneAlertState = 'NONE' | 'NUDGE_SENT' | 'OVERDUE_ESCALATED';
 export interface Milestone {
     milestoneId: string;
     title: string;
     status: MilestoneStatus;
     dueDate: Date;
     completed?: boolean;
+    alertState?: MilestoneAlertState;
 }
 export interface ExternalSync {
     system: 'NONE' | 'JIRA' | 'MS_PLANNER';
     externalKey?: string;
     externalTaskId?: string;
+    externalUrl?: string;
+    status?: 'SYNCED' | 'PENDING_CONFIG';
     lastSyncedAt?: Date;
 }
 export interface ActionPlanProps {

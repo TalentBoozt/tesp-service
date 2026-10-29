@@ -6,261 +6,184 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.ExcelReportGenerator = void 0;
 const path_1 = __importDefault(require("path"));
 const fs_1 = __importDefault(require("fs"));
+const exceljs_1 = __importDefault(require("exceljs"));
 const scoped_data_aggregator_service_1 = require("../services/scoped-data-aggregator.service");
+const storage_service_1 = require("../../../../shared/infrastructure/storage/storage.service");
+const pdf_report_generator_1 = require("./pdf-report.generator");
 class ExcelReportGenerator {
     aggregator = new scoped_data_aggregator_service_1.ScopedDataAggregatorService();
     async generateExcel(options) {
         const { reportId, projectId, campaignId, title, scopeType, scopeFilter } = options;
         const reportsDir = path_1.default.join(process.cwd(), 'tmp', 'reports');
         await fs_1.default.promises.mkdir(reportsDir, { recursive: true });
-        const metrics = await this.aggregator.aggregate(projectId, campaignId, scopeType, scopeFilter);
+        const metrics = await this.aggregator.aggregate(projectId, campaignId, scopeType, scopeFilter, options.bypassPrivacy);
         const fileName = `${reportId}.xlsx`;
         const filePath = path_1.default.join(reportsDir, fileName);
-        const xmlWorkbook = this.buildMultiTabWorkbook(title, metrics, options);
-        await fs_1.default.promises.writeFile(filePath, xmlWorkbook, 'utf-8');
-        const fileSizeBytes = Buffer.byteLength(xmlWorkbook, 'utf-8');
+        const organizationName = options.branding?.organizationName || 'Talnova Enterprise Survey Platform';
+        const primaryColor = (0, pdf_report_generator_1.sanitizeHexColor)(options.branding?.primaryColor, '#0F172A');
+        const headerArgb = 'FF' + primaryColor.replace('#', '').toUpperCase();
+        const workbook = new exceljs_1.default.Workbook();
+        workbook.creator = organizationName;
+        workbook.created = new Date();
+        // -------------------------------------------------------------
+        // Tab 1: Executive Summary
+        // -------------------------------------------------------------
+        const summarySheet = workbook.addWorksheet('Executive Summary', {
+            properties: { tabColor: { argb: 'FF1E293B' } },
+            headerFooter: {
+                oddHeader: `&C&B${organizationName} - Executive Summary`,
+            },
+        });
+        const categoryHeader = options.branding?.organizationName
+            ? `${options.branding.organizationName} - Metric Category`
+            : 'Metric Category';
+        summarySheet.columns = [
+            { header: categoryHeader, key: 'category', width: 34 },
+            { header: 'Metric Name', key: 'name', width: 34 },
+            { header: 'Score / Value', key: 'value', width: 22 },
+            { header: 'Benchmark', key: 'benchmark', width: 16 },
+            { header: 'Status / Notes', key: 'notes', width: 36 },
+        ];
+        // Style Header Row
+        const headerRow = summarySheet.getRow(1);
+        headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+        headerRow.fill = {
+            type: 'pattern',
+            pattern: 'solid',
+            fgColor: { argb: headerArgb },
+        };
+        if (metrics.isSuppressed) {
+            summarySheet.addRow({
+                category: 'Privacy Protection',
+                name: 'Anonymity Threshold Active',
+                value: 'SUPPRESSED',
+                benchmark: 'N/A',
+                notes: metrics.suppressionNotice || 'Sample size N < 5. Metrics suppressed to protect respondent privacy.',
+            });
+        }
+        else {
+            summarySheet.addRow({
+                category: 'eNPS',
+                name: 'Employee Net Promoter Score',
+                value: Number(metrics.enpsScore.toFixed(1)),
+                benchmark: 25.0,
+                notes: `${metrics.promotersPercent}% Promoters, ${metrics.passivesPercent}% Passives, ${metrics.detractorsPercent}% Detractors`,
+            });
+            const engagementBenchmark = options.includeBenchmarkComparison === false
+                ? 'N/A'
+                : options.benchmark !== undefined && options.benchmark !== null
+                    ? options.benchmark
+                    : 75.0;
+            summarySheet.addRow({
+                category: 'Engagement',
+                name: 'Overall Engagement Score',
+                value: Number(metrics.overallEngagementScore.toFixed(1)),
+                benchmark: engagementBenchmark,
+                notes: 'Scale 0 - 100',
+            });
+            summarySheet.addRow({
+                category: 'Participation',
+                name: 'Turnout & Response Rate',
+                value: `${metrics.participationRate}%`,
+                benchmark: '70%',
+                notes: `${metrics.sampleSize} of ${metrics.eligibleCount} eligible respondents`,
+            });
+            summarySheet.addRow({
+                category: 'Scope Metadata',
+                name: 'Tenant & Target Scope',
+                value: `${metrics.projectId}`,
+                benchmark: 'N/A',
+                notes: `Scope: ${metrics.scopeType}${options.scopeFilter?.nodeName ? ' (' + options.scopeFilter.nodeName + ')' : ''}`,
+            });
+        }
+        // -------------------------------------------------------------
+        // Tab 2: Core Driver Scores
+        // -------------------------------------------------------------
+        const driverSheet = workbook.addWorksheet('Core Driver Scores', {
+            properties: { tabColor: { argb: 'FF2563EB' } },
+            headerFooter: {
+                oddHeader: `&C&B${organizationName} - Core Driver Scores`,
+            },
+        });
+        driverSheet.columns = [
+            { header: 'Driver Code', key: 'code', width: 18 },
+            { header: 'Engagement Dimension', key: 'name', width: 36 },
+            { header: 'Score (0-5)', key: 'score', width: 16 },
+            { header: 'Global Benchmark', key: 'benchmark', width: 18 },
+            { header: 'Variance vs Benchmark', key: 'variance', width: 22 },
+            { header: 'Status', key: 'status', width: 16 },
+        ];
+        const driverHeaderRow = driverSheet.getRow(1);
+        driverHeaderRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+        driverHeaderRow.fill = {
+            type: 'pattern',
+            pattern: 'solid',
+            fgColor: { argb: 'FF1E40AF' },
+        };
+        if (!metrics.isSuppressed && metrics.driverScores) {
+            for (const d of metrics.driverScores) {
+                driverSheet.addRow({
+                    code: d.name.toUpperCase().replace(/[^A-Z0-9]/g, '_'),
+                    name: d.name,
+                    score: Number(d.score.toFixed(1)),
+                    benchmark: Number(d.benchmark.toFixed(1)),
+                    variance: Number(d.variance.toFixed(1)),
+                    status: d.variance >= 0 ? 'Favorable' : 'Below Benchmark',
+                });
+            }
+        }
+        // -------------------------------------------------------------
+        // Tab 3: Demographic Cross-Tabs
+        // -------------------------------------------------------------
+        const demographicSheet = workbook.addWorksheet('Demographic Cross-Tabs', {
+            properties: { tabColor: { argb: 'FF059669' } },
+            headerFooter: {
+                oddHeader: `&C&B${organizationName} - Demographic Cross-Tabs`,
+            },
+        });
+        demographicSheet.columns = [
+            { header: 'Node Code', key: 'nodeCode', width: 18 },
+            { header: 'Department / Unit Name', key: 'nodeName', width: 34 },
+            { header: 'Sample Size', key: 'sampleSize', width: 14 },
+            { header: 'eNPS Score', key: 'enps', width: 14 },
+            { header: 'Participation %', key: 'participation', width: 16 },
+            { header: 'Privacy Status', key: 'status', width: 16 },
+        ];
+        const demoHeaderRow = demographicSheet.getRow(1);
+        demoHeaderRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+        demoHeaderRow.fill = {
+            type: 'pattern',
+            pattern: 'solid',
+            fgColor: { argb: 'FF065F46' },
+        };
+        if (!metrics.isSuppressed && metrics.demographicBreakdown) {
+            for (const db of metrics.demographicBreakdown) {
+                demographicSheet.addRow({
+                    nodeCode: `${db.segment}:${db.value}`,
+                    nodeName: `${db.segment} - ${db.value}`,
+                    sampleSize: db.sampleSize,
+                    enps: db.isSuppressed ? 'SUPPRESSED' : Number(db.score.toFixed(1)),
+                    participation: `${metrics.participationRate}%`,
+                    status: db.isSuppressed ? 'SUPPRESSED (N<5)' : 'VALID',
+                });
+            }
+        }
+        // Export valid OpenXML XLSX binary buffer
+        const buffer = await workbook.xlsx.writeBuffer();
+        const nodeBuffer = Buffer.from(buffer);
+        await fs_1.default.promises.writeFile(filePath, nodeBuffer);
+        // Stream and upload artifact directly to S3 / Cloud Storage (GAP-008 / TASK-04-02)
+        const storageService = storage_service_1.StorageService.getInstance();
+        const storageKey = `reports/${projectId}/${reportId}.xlsx`;
+        await storageService.uploadArtifact(storageKey, nodeBuffer, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        const presignedDownloadUrl = await storageService.getPresignedDownloadUrl(storageKey, 86400);
         return {
             filePath,
             fileName,
-            fileSizeBytes,
-            downloadUrl: `/api/v1/reports/${reportId}/download`,
+            fileSizeBytes: nodeBuffer.length,
+            downloadUrl: presignedDownloadUrl,
             metrics,
         };
-    }
-    escapeXml(str) {
-        return String(str)
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;')
-            .replace(/'/g, '&apos;');
-    }
-    buildMultiTabWorkbook(title, metrics, options) {
-        const isSuppressed = metrics.isSuppressed;
-        // Sheet 1: Summary
-        const summaryRows = `
-      <Row>
-        <Cell ss:StyleID="HeaderTitle"><Data ss:Type="String">${this.escapeXml(title)}</Data></Cell>
-      </Row>
-      <Row>
-        <Cell><Data ss:Type="String">Tenant Workspace ID:</Data></Cell>
-        <Cell><Data ss:Type="String">${this.escapeXml(metrics.projectId)}</Data></Cell>
-      </Row>
-      <Row>
-        <Cell><Data ss:Type="String">Campaign Identifier:</Data></Cell>
-        <Cell><Data ss:Type="String">${this.escapeXml(metrics.campaignId)}</Data></Cell>
-      </Row>
-      <Row>
-        <Cell><Data ss:Type="String">Report Scope:</Data></Cell>
-        <Cell><Data ss:Type="String">${this.escapeXml(metrics.scopeType)} ${this.escapeXml(options.scopeFilter?.nodeName || '')}</Data></Cell>
-      </Row>
-      <Row>
-        <Cell><Data ss:Type="String">Total Sample Size (N):</Data></Cell>
-        <Cell><Data ss:Type="Number">${metrics.sampleSize}</Data></Cell>
-      </Row>
-      <Row>
-        <Cell><Data ss:Type="String">Participation Turnout:</Data></Cell>
-        <Cell><Data ss:Type="String">${metrics.participationRate}%</Data></Cell>
-      </Row>
-      <Row>
-        <Cell><Data ss:Type="String">Net Promoter Score (eNPS):</Data></Cell>
-        <Cell><Data ss:Type="String">${isSuppressed ? '[SUPPRESSED - N < 5]' : (metrics.enpsScore > 0 ? '+' : '') + metrics.enpsScore}</Data></Cell>
-      </Row>
-      <Row>
-        <Cell><Data ss:Type="String">Overall Engagement Index:</Data></Cell>
-        <Cell><Data ss:Type="String">${isSuppressed ? '[SUPPRESSED - N < 5]' : metrics.overallEngagementScore.toFixed(1) + ' / 5.0'}</Data></Cell>
-      </Row>
-      <Row>
-        <Cell><Data ss:Type="String">Privacy Anonymity Status:</Data></Cell>
-        <Cell><Data ss:Type="String">${isSuppressed ? 'SUPPRESSED (N < 5 Guard Active)' : 'COMPLIANT (Differential Privacy Preserved)'}</Data></Cell>
-      </Row>
-    `;
-        // Sheet 2: Driver Analysis
-        let driverRows = `
-      <Row ss:StyleID="TableHeader">
-        <Cell><Data ss:Type="String">Dimension Driver</Data></Cell>
-        <Cell><Data ss:Type="String">Tenant Score (out of 5)</Data></Cell>
-        <Cell><Data ss:Type="String">Industry Benchmark</Data></Cell>
-        <Cell><Data ss:Type="String">Variance</Data></Cell>
-        <Cell><Data ss:Type="String">Evaluation Status</Data></Cell>
-      </Row>
-    `;
-        if (isSuppressed) {
-            driverRows += `
-        <Row>
-          <Cell><Data ss:Type="String">[SUPPRESSED]</Data></Cell>
-          <Cell><Data ss:Type="String">***</Data></Cell>
-          <Cell><Data ss:Type="String">***</Data></Cell>
-          <Cell><Data ss:Type="String">***</Data></Cell>
-          <Cell><Data ss:Type="String">Sample size N &lt; 5 violates differential privacy threshold.</Data></Cell>
-        </Row>
-      `;
-        }
-        else {
-            metrics.driverScores.forEach((d) => {
-                const status = d.variance >= 0.2 ? 'Outperforming' : d.variance >= -0.1 ? 'On Par' : 'Attention Required';
-                driverRows += `
-          <Row>
-            <Cell><Data ss:Type="String">${this.escapeXml(d.name)}</Data></Cell>
-            <Cell><Data ss:Type="Number">${d.score}</Data></Cell>
-            <Cell><Data ss:Type="Number">${d.benchmark}</Data></Cell>
-            <Cell><Data ss:Type="Number">${d.variance}</Data></Cell>
-            <Cell><Data ss:Type="String">${this.escapeXml(status)}</Data></Cell>
-          </Row>
-        `;
-            });
-        }
-        // Sheet 3: Department Variances
-        let deptRows = `
-      <Row ss:StyleID="TableHeader">
-        <Cell><Data ss:Type="String">Department / Business Segment</Data></Cell>
-        <Cell><Data ss:Type="String">Sample Size (N)</Data></Cell>
-        <Cell><Data ss:Type="String">eNPS Score</Data></Cell>
-        <Cell><Data ss:Type="String">Engagement Mean</Data></Cell>
-        <Cell><Data ss:Type="String">Privacy Status</Data></Cell>
-      </Row>
-    `;
-        metrics.departmentBreakdown.forEach((dept) => {
-            if (dept.isSuppressed || isSuppressed) {
-                deptRows += `
-          <Row>
-            <Cell><Data ss:Type="String">${this.escapeXml(dept.department)}</Data></Cell>
-            <Cell><Data ss:Type="Number">${dept.sampleSize}</Data></Cell>
-            <Cell><Data ss:Type="String">[SUPPRESSED - N &lt; 5]</Data></Cell>
-            <Cell><Data ss:Type="String">[SUPPRESSED - N &lt; 5]</Data></Cell>
-            <Cell><Data ss:Type="String">Privacy Guard: Cell suppressed</Data></Cell>
-          </Row>
-        `;
-            }
-            else {
-                deptRows += `
-          <Row>
-            <Cell><Data ss:Type="String">${this.escapeXml(dept.department)}</Data></Cell>
-            <Cell><Data ss:Type="Number">${dept.sampleSize}</Data></Cell>
-            <Cell><Data ss:Type="String">${dept.enpsScore > 0 ? '+' : ''}${dept.enpsScore}</Data></Cell>
-            <Cell><Data ss:Type="Number">${dept.engagementScore}</Data></Cell>
-            <Cell><Data ss:Type="String">Unmasked</Data></Cell>
-          </Row>
-        `;
-            }
-        });
-        // Sheet 4: Demographic Cross-Tabs
-        let demoRows = `
-      <Row ss:StyleID="TableHeader">
-        <Cell><Data ss:Type="String">Demographic Category</Data></Cell>
-        <Cell><Data ss:Type="String">Cohort Value</Data></Cell>
-        <Cell><Data ss:Type="String">Sample Size (N)</Data></Cell>
-        <Cell><Data ss:Type="String">Engagement Score</Data></Cell>
-        <Cell><Data ss:Type="String">Differential Privacy Status</Data></Cell>
-      </Row>
-    `;
-        metrics.demographicBreakdown.forEach((demo) => {
-            if (demo.isSuppressed || isSuppressed) {
-                demoRows += `
-          <Row>
-            <Cell><Data ss:Type="String">${this.escapeXml(demo.segment)}</Data></Cell>
-            <Cell><Data ss:Type="String">${this.escapeXml(demo.value)}</Data></Cell>
-            <Cell><Data ss:Type="Number">${demo.sampleSize}</Data></Cell>
-            <Cell><Data ss:Type="String">[SUPPRESSED]</Data></Cell>
-            <Cell><Data ss:Type="String">Redacted (N &lt; 5)</Data></Cell>
-          </Row>
-        `;
-            }
-            else {
-                demoRows += `
-          <Row>
-            <Cell><Data ss:Type="String">${this.escapeXml(demo.segment)}</Data></Cell>
-            <Cell><Data ss:Type="String">${this.escapeXml(demo.value)}</Data></Cell>
-            <Cell><Data ss:Type="Number">${demo.sampleSize}</Data></Cell>
-            <Cell><Data ss:Type="Number">${demo.score}</Data></Cell>
-            <Cell><Data ss:Type="String">Verified Anonymized</Data></Cell>
-          </Row>
-        `;
-            }
-        });
-        // Sheet 5: AI Themes
-        let aiRows = `
-      <Row ss:StyleID="TableHeader">
-        <Cell><Data ss:Type="String">NLP Qualitative Theme</Data></Cell>
-        <Cell><Data ss:Type="String">Sentiment Category</Data></Cell>
-        <Cell><Data ss:Type="String">Frequency Count</Data></Cell>
-        <Cell><Data ss:Type="String">Representative Extract</Data></Cell>
-      </Row>
-    `;
-        if (isSuppressed) {
-            aiRows += `
-        <Row>
-          <Cell><Data ss:Type="String">[SUPPRESSED - N &lt; 5]</Data></Cell>
-          <Cell><Data ss:Type="String">***</Data></Cell>
-          <Cell><Data ss:Type="String">***</Data></Cell>
-          <Cell><Data ss:Type="String">Verbatim text suppressed to protect respondent anonymity.</Data></Cell>
-        </Row>
-      `;
-        }
-        else {
-            metrics.aiSentiment.topThemes.forEach((t, i) => {
-                const verbatim = metrics.aiSentiment.verbatimHighlights[i] || 'N/A';
-                aiRows += `
-          <Row>
-            <Cell><Data ss:Type="String">${this.escapeXml(t.theme)}</Data></Cell>
-            <Cell><Data ss:Type="String">${this.escapeXml(t.sentiment)}</Data></Cell>
-            <Cell><Data ss:Type="Number">${t.count}</Data></Cell>
-            <Cell><Data ss:Type="String">${this.escapeXml(verbatim)}</Data></Cell>
-          </Row>
-        `;
-            });
-        }
-        return `<?xml version="1.0" encoding="UTF-8"?>
-<?mso-application progid="Excel.Sheet"?>
-<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"
- xmlns:o="urn:schemas-microsoft-com:office:office"
- xmlns:x="urn:schemas-microsoft-com:office:excel"
- xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"
- xmlns:html="http://www.w3.org/TR/REC-html40">
- <Styles>
-  <Style ss:ID="Default" ss:Name="Normal">
-   <Alignment ss:Vertical="Bottom"/>
-   <Font ss:FontName="Calibri" x:Family="Swiss" ss:Size="11" ss:Color="#000000"/>
-  </Style>
-  <Style ss:ID="HeaderTitle">
-   <Font ss:FontName="Calibri" ss:Size="14" ss:Bold="1" ss:Color="#1e293b"/>
-  </Style>
-  <Style ss:ID="TableHeader">
-   <Font ss:FontName="Calibri" ss:Size="11" ss:Bold="1" ss:Color="#ffffff"/>
-   <Interior ss:Color="#1e293b" ss:Pattern="Solid"/>
-  </Style>
- </Styles>
-
- <Worksheet ss:Name="Summary">
-  <Table ss:DefaultColumnWidth="180">
-   ${summaryRows}
-  </Table>
- </Worksheet>
-
- <Worksheet ss:Name="Driver Analysis">
-  <Table ss:DefaultColumnWidth="160">
-   ${driverRows}
-  </Table>
- </Worksheet>
-
- <Worksheet ss:Name="Department Variances">
-  <Table ss:DefaultColumnWidth="160">
-   ${deptRows}
-  </Table>
- </Worksheet>
-
- <Worksheet ss:Name="Demographic Cross-Tabs">
-  <Table ss:DefaultColumnWidth="160">
-   ${demoRows}
-  </Table>
- </Worksheet>
-
- <Worksheet ss:Name="AI Themes">
-  <Table ss:DefaultColumnWidth="220">
-   ${aiRows}
-  </Table>
- </Worksheet>
-</Workbook>`;
     }
 }
 exports.ExcelReportGenerator = ExcelReportGenerator;

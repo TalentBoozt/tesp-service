@@ -21,7 +21,16 @@ class ZeptoMailDispatcher {
         const region = req.region || 'US';
         const endpoint = ZeptoMailDispatcher.getEndpoint(region);
         // If apiKey is a placeholder, simulated, or missing in test environments, simulate delivery
+        const isProd = process.env.NODE_ENV === 'production';
         const isMock = !req.apiKey || req.apiKey.startsWith('mock') || req.apiKey.startsWith('••••') || req.apiKey.includes('placeholder');
+        if (isProd && isMock) {
+            return {
+                success: false,
+                statusCode: 401,
+                error: 'MISSING_API_KEY: ZeptoMail API key is missing or invalid in production environment',
+                provider: 'ZOHO_ZEPTOMAIL_CPAAS',
+            };
+        }
         if (isMock) {
             return {
                 success: true,

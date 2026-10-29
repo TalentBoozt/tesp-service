@@ -5,18 +5,23 @@ const express_1 = require("express");
 const mongo_notification_repository_1 = require("../../infrastructure/persistence/mongoose/mongo-notification.repository");
 const notification_service_1 = require("../../infrastructure/services/notification.service");
 const auth_middleware_1 = require("../../../../shared/presentation/middleware/auth.middleware");
+const tenant_context_1 = require("../../../../shared/presentation/utils/tenant-context");
 function createNotificationRouter(repo = new mongo_notification_repository_1.MongoNotificationRepository(), service = notification_service_1.notificationService) {
     const router = (0, express_1.Router)();
     // 1. List Tenant Notifications
     router.get('/notifications', auth_middleware_1.authenticate, async (req, res, next) => {
         try {
             const user = req.user;
-            const requestedProjectId = req.query.projectId || user.projectId || 'PRJ-99201';
-            // Check project access if consultant/tenant
+            const requestedProjectId = (0, tenant_context_1.resolveTenantProjectId)(req);
+            // Check project access if not SUPER_ADMIN
+            const userProjects = user.authorizedProjectIds && user.authorizedProjectIds.length > 0
+                ? user.authorizedProjectIds
+                : user.projectId
+                    ? [user.projectId]
+                    : [];
             if (user.role !== auth_middleware_1.UserRole.SUPER_ADMIN &&
-                user.authorizedProjectIds &&
-                user.authorizedProjectIds.length > 0 &&
-                !user.authorizedProjectIds.includes(requestedProjectId)) {
+                userProjects.length > 0 &&
+                !userProjects.includes(requestedProjectId)) {
                 return res.status(403).json({
                     type: 'https://tesp-api.talnova.io/errors/forbidden',
                     title: 'Forbidden',
@@ -53,7 +58,7 @@ function createNotificationRouter(repo = new mongo_notification_repository_1.Mon
     router.get('/notifications/unread-count', auth_middleware_1.authenticate, async (req, res, next) => {
         try {
             const user = req.user;
-            const projectId = req.query.projectId || user.projectId || 'PRJ-99201';
+            const projectId = (0, tenant_context_1.resolveTenantProjectId)(req);
             const unreadCount = await repo.countUnread(projectId, user.userId, user.role);
             res.status(200).json({
                 projectId,
@@ -69,7 +74,7 @@ function createNotificationRouter(repo = new mongo_notification_repository_1.Mon
         try {
             const user = req.user;
             const { notificationId } = req.params;
-            const projectId = req.query.projectId || user.projectId || 'PRJ-99201';
+            const projectId = (0, tenant_context_1.resolveTenantProjectId)(req);
             const success = await repo.markAsRead(notificationId, projectId);
             res.status(200).json({
                 success,
@@ -84,7 +89,7 @@ function createNotificationRouter(repo = new mongo_notification_repository_1.Mon
     router.post('/notifications/mark-all-read', auth_middleware_1.authenticate, async (req, res, next) => {
         try {
             const user = req.user;
-            const projectId = req.body?.projectId || user.projectId || 'PRJ-99201';
+            const projectId = (0, tenant_context_1.resolveTenantProjectId)(req);
             const modifiedCount = await repo.markAllAsRead(projectId, user.userId, user.role);
             res.status(200).json({
                 success: true,
@@ -101,7 +106,7 @@ function createNotificationRouter(repo = new mongo_notification_repository_1.Mon
         try {
             const user = req.user;
             const { notificationId } = req.params;
-            const projectId = req.query.projectId || user.projectId || 'PRJ-99201';
+            const projectId = (0, tenant_context_1.resolveTenantProjectId)(req);
             const success = await repo.delete(notificationId, projectId);
             res.status(200).json({
                 success,
@@ -115,8 +120,11 @@ function createNotificationRouter(repo = new mongo_notification_repository_1.Mon
     // 6. Simulate Platform Event (Testing & Demo helper)
     router.post('/notifications/simulate', auth_middleware_1.authenticate, async (req, res, next) => {
         try {
+            if (process.env.NODE_ENV === 'production') {
+                return res.status(404).json({ error: 'Endpoint not found' });
+            }
             const user = req.user;
-            const projectId = req.body?.projectId || user.projectId || 'PRJ-99201';
+            const projectId = (0, tenant_context_1.resolveTenantProjectId)(req);
             const type = req.body?.type || 'AI_ANOMALY';
             let created;
             if (type === 'AI_ANOMALY') {

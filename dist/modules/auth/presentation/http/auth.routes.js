@@ -1,4 +1,7 @@
 "use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.createAuthRouter = createAuthRouter;
 const express_1 = require("express");
@@ -10,6 +13,8 @@ const change_password_use_case_1 = require("../../application/use-cases/change-p
 const auth_seeder_service_1 = require("../../infrastructure/services/auth-seeder.service");
 const auth_middleware_1 = require("../../../../shared/presentation/middleware/auth.middleware");
 const rate_limit_middleware_1 = require("../../../../shared/presentation/middleware/rate-limit.middleware");
+const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
+const config_1 = require("../../../../config");
 function createAuthRouter() {
     const router = (0, express_1.Router)();
     const loginUseCase = new login_use_case_1.LoginUseCase();
@@ -102,7 +107,7 @@ function createAuthRouter() {
         }
     });
     // 3. User Invitation (Authenticated, Role-Guarded)
-    router.post('/invite', auth_middleware_1.authenticate, async (req, res) => {
+    router.post('/invite', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([auth_middleware_1.UserRole.SUPER_ADMIN, auth_middleware_1.UserRole.PROJECT_ADMIN, auth_middleware_1.UserRole.CONSULTANT_DAASH]), async (req, res) => {
         try {
             const { email, firstName, lastName, role, projectId, firmId } = req.body || {};
             const result = await inviteUserUseCase.execute({
@@ -112,7 +117,7 @@ function createAuthRouter() {
                 firstName,
                 lastName,
                 role,
-                projectId: projectId || req.user?.projectId || 'PRJ-99201',
+                projectId: projectId || req.user?.projectId,
                 firmId,
             });
             return res.status(201).json(result);
@@ -174,6 +179,33 @@ function createAuthRouter() {
     });
     // 7. Seed / Re-sync Default Accounts (Utility)
     router.post('/seed', async (req, res) => {
+        if (process.env.NODE_ENV === 'production') {
+            return res.status(404).json({ success: false, message: 'Not found' });
+        }
+        const adminSeedSecret = process.env.ADMIN_SEED_SECRET;
+        const providedSecret = req.headers['x-admin-seed-secret'];
+        let isSuperAdmin = false;
+        const authHeader = req.headers.authorization;
+        if (authHeader && authHeader.startsWith('Bearer ')) {
+            try {
+                const token = authHeader.split(' ')[1];
+                const decoded = jsonwebtoken_1.default.verify(token, config_1.config.jwtSecret);
+                if (decoded && (0, auth_middleware_1.normalizeUserRole)(decoded.role) === auth_middleware_1.UserRole.SUPER_ADMIN) {
+                    isSuperAdmin = true;
+                }
+            }
+            catch {
+                // Fall through to secret check
+            }
+        }
+        if (!isSuperAdmin) {
+            if (!adminSeedSecret || !providedSecret || providedSecret !== adminSeedSecret) {
+                return res.status(403).json({
+                    success: false,
+                    message: 'Access denied: Valid X-Admin-Seed-Secret header or SuperAdmin authorization required.',
+                });
+            }
+        }
         try {
             await seederService.seedDefaultUsers(true);
             return res.status(200).json({ success: true, message: 'Default seed users verified and created.' });

@@ -9,6 +9,12 @@ class ConsultingFirmSeederService {
         this.repo = repo;
     }
     async seedDefaultFirms(forceOverwrite = false) {
+        const isProduction = process.env.NODE_ENV === 'production';
+        const allowDemo = process.env.ALLOW_DEMO_SEEDING === 'true';
+        if (isProduction && !allowDemo) {
+            console.log('[ConsultingFirmSeeder] Production mode active without ALLOW_DEMO_SEEDING=true. Skipping demo consulting firm seeding.');
+            return;
+        }
         const defaultFirms = [
             new consulting_firm_entity_1.ConsultingFirmEntity({
                 firmId: 'FIRM-DAASH-01',
@@ -39,6 +45,12 @@ class ConsultingFirmSeederService {
         }
     }
     async ensureDefaultFirmsExist() {
+        const isProduction = process.env.NODE_ENV === 'production';
+        const allowDemo = process.env.ALLOW_DEMO_SEEDING === 'true';
+        if (isProduction && !allowDemo) {
+            console.log('[ConsultingFirmSeeder] Production mode active without ALLOW_DEMO_SEEDING=true. Skipping demo consulting firm seeding.');
+            return;
+        }
         const count = await this.repo.count();
         if (count === 0) {
             await this.seedDefaultFirms(false);

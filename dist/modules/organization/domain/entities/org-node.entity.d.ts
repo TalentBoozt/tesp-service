@@ -9,6 +9,8 @@ export interface IOrgNodeProps {
     depth?: number;
     displayOrder?: number;
     status?: OrgNodeStatus;
+    headCount?: number;
+    directHeadCount?: number;
     attributes?: Record<string, any>;
     version?: number;
     isDeleted?: boolean;
@@ -27,6 +29,8 @@ export declare class OrgNodeEntity {
     private _depth;
     private _displayOrder;
     private _status;
+    private _headCount?;
+    private _directHeadCount?;
     private _attributes;
     private _version;
     private _isDeleted;
@@ -53,6 +57,9 @@ export declare class OrgNodeEntity {
     setPathAndParent(newParentId: string | null, parentPath?: string): void;
     setStatus(newStatus: OrgNodeStatus): void;
     markAsDeleted(): void;
+    get headCount(): number;
+    get directHeadCount(): number;
+    setHeadCount(totalCount: number, directCount?: number): void;
     toJSON(): {
         projectId: string;
         nodeId: string;
@@ -63,7 +70,11 @@ export declare class OrgNodeEntity {
         depth: number;
         displayOrder: number;
         status: OrgNodeStatus;
-        attributes: Record<string, any>;
+        headCount: number;
+        directHeadCount: number;
+        attributes: {
+            Headcount: number;
+        };
         version: number;
         isDeleted: boolean;
         createdAt: Date;

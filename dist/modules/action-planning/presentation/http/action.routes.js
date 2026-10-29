@@ -14,19 +14,35 @@ const update_action_plan_use_case_1 = require("../../application/use-cases/updat
 const delete_action_plan_use_case_1 = require("../../application/use-cases/delete-action-plan.use-case");
 const action_controller_1 = require("./action.controller");
 const auth_middleware_1 = require("../../../../shared/presentation/middleware/auth.middleware");
-function createActionPlanningRouter(actionPlanRepo, templateRepo) {
+const analytics_threshold_subscriber_1 = require("../../application/subscribers/analytics-threshold.subscriber");
+const workplace_risk_subscriber_1 = require("../../application/subscribers/workplace-risk.subscriber");
+const action_webhook_signature_middleware_1 = require("../middleware/action-webhook-signature.middleware");
+function createActionPlanningRouter(actionPlanRepo, templateRepo, projectRepo, responseRepo) {
     const router = (0, express_1.Router)();
     const planRepo = actionPlanRepo || new action_plan_repository_1.ActionPlanMongoRepository();
     const tplRepo = templateRepo || new action_template_repository_1.ActionTemplateMongoRepository();
+    // Initialize closed-loop subscribers (GAP-011 / TASK-05-01)
+    try {
+        analytics_threshold_subscriber_1.AnalyticsThresholdSubscriber.getInstance(planRepo, tplRepo).init();
+        workplace_risk_subscriber_1.WorkplaceRiskSubscriber.getInstance(planRepo).init();
+    }
+    catch {
+        // Non-blocking in test bootstrap
+    }
     const createActionPlanUseCase = new create_action_plan_use_case_1.CreateActionPlanUseCase(planRepo);
     const transitionActionPlanStatusUseCase = new transition_action_plan_status_use_case_1.TransitionActionPlanStatusUseCase(planRepo);
-    const getRecommendedTemplatesUseCase = new get_recommended_templates_use_case_1.GetRecommendedTemplatesUseCase(tplRepo);
-    const syncExternalTaskUseCase = new sync_external_task_use_case_1.SyncExternalTaskUseCase(planRepo);
+    const getRecommendedTemplatesUseCase = new get_recommended_templates_use_case_1.GetRecommendedTemplatesUseCase(tplRepo, responseRepo);
+    const syncExternalTaskUseCase = new sync_external_task_use_case_1.SyncExternalTaskUseCase(planRepo, undefined, projectRepo);
     const listActionPlansUseCase = new list_action_plans_use_case_1.ListActionPlansUseCase(planRepo);
     const getActionPlanUseCase = new get_action_plan_use_case_1.GetActionPlanUseCase(planRepo);
     const updateActionPlanUseCase = new update_action_plan_use_case_1.UpdateActionPlanUseCase(planRepo);
     const deleteActionPlanUseCase = new delete_action_plan_use_case_1.DeleteActionPlanUseCase(planRepo);
-    const controller = new action_controller_1.ActionController(createActionPlanUseCase, transitionActionPlanStatusUseCase, getRecommendedTemplatesUseCase, syncExternalTaskUseCase, listActionPlansUseCase, getActionPlanUseCase, updateActionPlanUseCase, deleteActionPlanUseCase);
+    const controller = new action_controller_1.ActionController(createActionPlanUseCase, transitionActionPlanStatusUseCase, getRecommendedTemplatesUseCase, syncExternalTaskUseCase, listActionPlansUseCase, getActionPlanUseCase, updateActionPlanUseCase, deleteActionPlanUseCase, planRepo, projectRepo);
+    // Inbound Webhooks for Jira & Planner (GAP-002 / TASK-02-01)
+    router.post('/projects/:projectId/actions/webhooks/jira', action_webhook_signature_middleware_1.verifyActionWebhookSignatureMiddleware, controller.handleJiraWebhook);
+    router.post('/projects/:projectId/actions/webhooks/planner', action_webhook_signature_middleware_1.verifyActionWebhookSignatureMiddleware, controller.handlePlannerWebhook);
+    router.post('/actions/webhooks/jira', action_webhook_signature_middleware_1.verifyActionWebhookSignatureMiddleware, controller.handleJiraWebhook);
+    router.post('/actions/webhooks/planner', action_webhook_signature_middleware_1.verifyActionWebhookSignatureMiddleware, controller.handlePlannerWebhook);
     router.use('/actions', auth_middleware_1.authenticate);
     router.post('/actions', (0, auth_middleware_1.authorize)([
         auth_middleware_1.UserRole.SUPER_ADMIN,

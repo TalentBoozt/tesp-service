@@ -40,7 +40,7 @@ const SurveySchema = new mongoose_1.Schema({
     surveyId: {
         type: String,
         required: true,
-        match: /^SRV-[A-Za-z0-9_-]{3,20}$/,
+        match: /^SRV-[A-Za-z0-9_-]{3,50}$/,
     },
     version: { type: Number, default: 1, required: true },
     title: { type: mongoose_1.Schema.Types.Mixed, required: true },

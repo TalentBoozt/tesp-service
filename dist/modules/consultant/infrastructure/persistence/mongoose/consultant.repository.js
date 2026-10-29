@@ -4,21 +4,12 @@ exports.ConsultantMongoRepository = void 0;
 const consultant_entities_1 = require("../../../domain/entities/consultant.entities");
 const consultant_models_1 = require("./consultant.models");
 class ConsultantMongoRepository {
-    isBootstrapped = false;
-    async ensureBootstrap() {
-        if (this.isBootstrapped)
-            return;
-        await this.seedDefaultsIfEmpty();
-        this.isBootstrapped = true;
-    }
     async findEngagements(projectId) {
-        await this.ensureBootstrap();
-        const query = projectId && projectId !== 'PRJ-DEFAULT' && projectId !== 'GLOBAL' ? { projectId } : {};
-        let docs = await consultant_models_1.ClientEngagementModel.find(query).sort({ updatedAt: -1 });
-        if (docs.length === 0 && Object.keys(query).length > 0) {
-            // Fallback to all engagements if specific project has none
-            docs = await consultant_models_1.ClientEngagementModel.find({}).sort({ updatedAt: -1 });
+        if (!projectId || projectId === 'PRJ-DEFAULT' || projectId === 'GLOBAL') {
+            return []; // Strict tenant isolation: do not permit unconstrained queries
         }
+        const query = { projectId };
+        const docs = await consultant_models_1.ClientEngagementModel.find(query).sort({ updatedAt: -1 });
         return docs.map((d) => new consultant_entities_1.ClientEngagementEntity({
             id: d._id ? d._id.toString() : d.id,
             projectId: d.projectId,
@@ -38,7 +29,6 @@ class ConsultantMongoRepository {
         }));
     }
     async findBenchmarks(sector) {
-        await this.ensureBootstrap();
         const query = sector && sector !== 'ALL' ? { sector } : {};
         const docs = await consultant_models_1.IndustryBenchmarkModel.find(query);
         return docs.map((d) => new consultant_entities_1.IndustryBenchmarkEntity({
@@ -54,12 +44,11 @@ class ConsultantMongoRepository {
         }));
     }
     async findWorkshops(projectId) {
-        await this.ensureBootstrap();
-        const query = projectId && projectId !== 'PRJ-DEFAULT' && projectId !== 'GLOBAL' ? { projectId } : {};
-        let docs = await consultant_models_1.ExecutiveWorkshopModel.find(query).sort({ scheduledDate: -1 });
-        if (docs.length === 0 && Object.keys(query).length > 0) {
-            docs = await consultant_models_1.ExecutiveWorkshopModel.find({}).sort({ scheduledDate: -1 });
+        if (!projectId || projectId === 'PRJ-DEFAULT' || projectId === 'GLOBAL') {
+            return []; // Strict tenant isolation
         }
+        const query = { projectId };
+        const docs = await consultant_models_1.ExecutiveWorkshopModel.find(query).sort({ scheduledDate: -1 });
         return docs.map((d) => new consultant_entities_1.ExecutiveWorkshopEntity({
             id: d._id ? d._id.toString() : d.id,
             projectId: d.projectId,
@@ -76,11 +65,14 @@ class ConsultantMongoRepository {
         }));
     }
     async createWorkshop(workshop) {
+        if (!workshop.projectId) {
+            throw new Error('Project ID is required to create a workshop');
+        }
         const doc = await consultant_models_1.ExecutiveWorkshopModel.create({
-            projectId: workshop.projectId || 'PRJ-99201',
+            projectId: workshop.projectId,
             title: workshop.title,
             clientName: workshop.clientName,
-            consultantLead: workshop.consultantLead || 'Dr. Samantha Perera (Daash Global)',
+            consultantLead: workshop.consultantLead || 'Lead Consultant',
             scheduledDate: workshop.scheduledDate || new Date().toISOString().split('T')[0],
             status: workshop.status || 'READY_FOR_EXEC',
             keyThemes: workshop.keyThemes || [],
@@ -103,12 +95,11 @@ class ConsultantMongoRepository {
         });
     }
     async findSignoffQueue(projectId) {
-        await this.ensureBootstrap();
-        const query = projectId && projectId !== 'PRJ-DEFAULT' && projectId !== 'GLOBAL' ? { projectId } : {};
-        let docs = await consultant_models_1.AiSignoffModel.find(query).sort({ createdAt: -1 });
-        if (docs.length === 0 && Object.keys(query).length > 0) {
-            docs = await consultant_models_1.AiSignoffModel.find({}).sort({ createdAt: -1 });
+        if (!projectId || projectId === 'PRJ-DEFAULT' || projectId === 'GLOBAL') {
+            return []; // Strict tenant isolation
         }
+        const query = { projectId };
+        const docs = await consultant_models_1.AiSignoffModel.find(query).sort({ createdAt: -1 });
         return docs.map((d) => new consultant_entities_1.AiSignoffEntity({
             id: d._id ? d._id.toString() : d.id,
             projectId: d.projectId,

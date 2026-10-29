@@ -34,12 +34,21 @@ class SmtpDispatcher {
     async sendMail(req) {
         const effectivePass = req.password || (req.provider === 'ZOHO_SMTP' ? process.env.SMTP_PASS : undefined);
         const effectiveUser = req.user || (req.provider === 'ZOHO_SMTP' ? process.env.SMTP_USER : undefined);
-        const isMock = process.env.NODE_ENV === 'test' ||
-            !effectivePass ||
-            effectivePass.startsWith('••••') ||
-            effectivePass.startsWith('mock') ||
-            !effectiveUser ||
-            effectiveUser.includes('mock');
+        const isProd = process.env.NODE_ENV === 'production';
+        const isMock = !isProd &&
+            (process.env.NODE_ENV === 'test' ||
+                !effectivePass ||
+                effectivePass.startsWith('••••') ||
+                effectivePass.startsWith('mock') ||
+                !effectiveUser ||
+                effectiveUser.includes('mock'));
+        if (isProd && (!effectivePass || !effectiveUser || effectivePass.startsWith('••••') || effectivePass.startsWith('mock') || effectiveUser.includes('mock'))) {
+            return {
+                success: false,
+                error: `MISSING_SMTP_CREDENTIALS: SMTP credentials not configured for provider ${req.provider} in production environment`,
+                provider: req.provider,
+            };
+        }
         if (isMock) {
             return {
                 success: true,
@@ -55,7 +64,11 @@ class SmtpDispatcher {
                 secure: config.secure,
                 auth: config.auth,
                 tls: {
-                    rejectUnauthorized: false,
+                    rejectUnauthorized: process.env.NODE_ENV === 'production'
+                        ? true
+                        : process.env.SMTP_ALLOW_INSECURE_TLS === 'true'
+                            ? false
+                            : true,
                 },
             });
             const recipientList = req.to.map((r) => (r.name ? `"${r.name}" <${r.email}>` : r.email)).join(', ');
@@ -86,12 +99,20 @@ class SmtpDispatcher {
     async verifyConnection(req) {
         const effectivePass = req.password || (req.provider === 'ZOHO_SMTP' ? process.env.SMTP_PASS : undefined);
         const effectiveUser = req.user || (req.provider === 'ZOHO_SMTP' ? process.env.SMTP_USER : undefined);
-        const isMock = process.env.NODE_ENV === 'test' ||
-            !effectivePass ||
-            effectivePass.startsWith('••••') ||
-            effectivePass.startsWith('mock') ||
-            !effectiveUser ||
-            effectiveUser.includes('mock');
+        const isProd = process.env.NODE_ENV === 'production';
+        const isMock = !isProd &&
+            (process.env.NODE_ENV === 'test' ||
+                !effectivePass ||
+                effectivePass.startsWith('••••') ||
+                effectivePass.startsWith('mock') ||
+                !effectiveUser ||
+                effectiveUser.includes('mock'));
+        if (isProd && (!effectivePass || !effectiveUser || effectivePass.startsWith('••••') || effectivePass.startsWith('mock') || effectiveUser.includes('mock'))) {
+            return {
+                success: false,
+                message: `SMTP Connection failed: Missing or invalid SMTP credentials for provider ${req.provider} in production environment`,
+            };
+        }
         if (isMock) {
             return {
                 success: true,
@@ -105,7 +126,13 @@ class SmtpDispatcher {
                 port: config.port,
                 secure: config.secure,
                 auth: config.auth,
-                tls: { rejectUnauthorized: false },
+                tls: {
+                    rejectUnauthorized: process.env.NODE_ENV === 'production'
+                        ? true
+                        : process.env.SMTP_ALLOW_INSECURE_TLS === 'true'
+                            ? false
+                            : true,
+                },
             });
             await transporter.verify();
             return {

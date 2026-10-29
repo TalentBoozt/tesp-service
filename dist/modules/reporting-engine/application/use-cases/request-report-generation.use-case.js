@@ -2,30 +2,42 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.RequestReportGenerationUseCase = void 0;
 const report_job_entity_1 = require("../../domain/entities/report-job.entity");
-const csv_report_generator_1 = require("../../infrastructure/generators/csv-report.generator");
-const pdf_report_generator_1 = require("../../infrastructure/generators/pdf-report.generator");
-const excel_report_generator_1 = require("../../infrastructure/generators/excel-report.generator");
-const ppt_report_generator_1 = require("../../infrastructure/generators/ppt-report.generator");
-const report_generated_event_1 = require("../../domain/events/report-generated.event");
+const report_job_queue_1 = require("../../infrastructure/queue/report-job.queue");
+const report_job_worker_1 = require("../../infrastructure/queue/report-job.worker");
+const event_bus_1 = require("../../../../shared/domain/events/event-bus");
 class RequestReportGenerationUseCase {
     reportJobRepo;
-    csvGenerator;
-    pdfGenerator;
-    excelGenerator;
-    pptGenerator;
-    constructor(reportJobRepo) {
+    eventBus;
+    projectRepo;
+    reportQueue;
+    reportWorker;
+    constructor(reportJobRepo, eventBus = event_bus_1.DomainEventBus.getInstance(), reportQueue, reportWorker, projectRepo) {
         this.reportJobRepo = reportJobRepo;
-        this.csvGenerator = new csv_report_generator_1.CsvReportGenerator();
-        this.pdfGenerator = new pdf_report_generator_1.PdfReportGenerator();
-        this.excelGenerator = new excel_report_generator_1.ExcelReportGenerator();
-        this.pptGenerator = new ppt_report_generator_1.PptReportGenerator();
+        this.eventBus = eventBus;
+        this.projectRepo = projectRepo;
+        this.reportQueue = reportQueue || report_job_queue_1.PersistentReportJobQueue.getInstance();
+        this.reportWorker = reportWorker || new report_job_worker_1.ReportJobWorker(this.reportQueue, reportJobRepo, eventBus);
+    }
+    get pdfGenerator() {
+        return this.reportWorker.pdfGenerator;
+    }
+    set pdfGenerator(val) {
+        this.reportWorker.pdfGenerator = val;
+    }
+    get excelGenerator() {
+        return this.reportWorker.excelGenerator;
+    }
+    set excelGenerator(val) {
+        this.reportWorker.excelGenerator = val;
     }
     async execute(dto, requestedBy) {
         const jobId = `JOB-${Math.floor(10000000 + Math.random() * 90000000)}`;
         const determinedReportType = dto.reportType ||
             (dto.format === 'EXCEL'
                 ? 'RAW_RESPONSES_XLSX'
-                : 'EXEC_SUMMARY_PDF');
+                : dto.format === 'POWERPOINT'
+                    ? 'BOARDROOM_DECK_POWERPOINT'
+                    : 'EXEC_SUMMARY_PDF');
         const job = new report_job_entity_1.ReportJobEntity({
             projectId: dto.projectId,
             campaignId: dto.campaignId,
@@ -36,82 +48,50 @@ class RequestReportGenerationUseCase {
             status: 'QUEUED',
         });
         await this.reportJobRepo.save(job);
-        // Asynchronous background worker report compilation (FR-RPT-001)
-        setTimeout(async () => {
+        let branding;
+        let benchmark;
+        if (this.projectRepo) {
             try {
-                job.status = 'PROCESSING';
-                await this.reportJobRepo.save(job);
-                const scopeType = dto.scopeType || (dto.nodeId ? 'DEPARTMENT' : 'ORGANIZATION');
-                const scopeFilter = dto.scopeFilter || (dto.nodeId ? { nodeId: dto.nodeId } : undefined);
-                const title = dto.title || `Enterprise Survey Report (${scopeType})`;
-                let result;
-                if (dto.format === 'EXCEL') {
-                    result = await this.excelGenerator.generateExcel({
-                        reportId: jobId,
-                        projectId: dto.projectId,
-                        campaignId: dto.campaignId,
-                        title,
-                        scopeType,
-                        scopeFilter,
-                        includeAiSentimentSummary: dto.includeAiSentimentSummary ?? true,
-                        includeBenchmarkComparison: dto.includeBenchmarkComparison ?? true,
-                        requestedBy,
-                    });
+                const project = await this.projectRepo.findByProjectId(dto.projectId);
+                if (project) {
+                    if (project.branding) {
+                        branding = {
+                            primaryColor: project.branding.primaryColor,
+                            logoUrl: project.branding.logoUrl,
+                            organizationName: project.branding.companyName || project.name,
+                        };
+                    }
+                    if (project.benchmarkSettings) {
+                        benchmark = project.benchmarkSettings.overallScoreBenchmark ?? null;
+                    }
                 }
-                else if (dto.format === 'POWERPOINT') {
-                    result = await this.pptGenerator.generatePpt({
-                        reportId: jobId,
-                        projectId: dto.projectId,
-                        campaignId: dto.campaignId,
-                        title,
-                        scopeType,
-                        scopeFilter,
-                        requestedBy,
-                    });
-                }
-                else if (dto.format === 'PDF' || determinedReportType === 'EXEC_SUMMARY_PDF' || determinedReportType === 'DEPT_BREAKDOWN_PDF') {
-                    result = await this.pdfGenerator.generatePdf({
-                        reportId: jobId,
-                        projectId: dto.projectId,
-                        campaignId: dto.campaignId,
-                        title,
-                        scopeType,
-                        scopeFilter,
-                        includeAiSentimentSummary: dto.includeAiSentimentSummary ?? true,
-                        includeBenchmarkComparison: dto.includeBenchmarkComparison ?? true,
-                        passwordProtected: dto.passwordProtected ?? (!!dto.pdfPassword),
-                        pdfPassword: dto.pdfPassword,
-                        requestedBy,
-                    });
-                }
-                else {
-                    result = await this.csvGenerator.generateReport({
-                        projectId: dto.projectId,
-                        campaignId: dto.campaignId,
-                        reportId: jobId,
-                        reportType: determinedReportType,
-                        nodeId: dto.nodeId,
-                        requestedBy,
-                    });
-                }
-                const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
-                job.completeJob(result.downloadUrl, expiresAt, result.fileSizeBytes);
-                await this.reportJobRepo.save(job);
-                // Emit ReportGeneratedEvent (FR-RPT-008)
-                new report_generated_event_1.ReportGeneratedEvent({
-                    projectId: dto.projectId,
-                    campaignId: dto.campaignId,
-                    jobId,
-                    reportType: determinedReportType,
-                    downloadUrl: result.downloadUrl,
-                    expiresAt: expiresAt.toISOString(),
-                });
             }
-            catch (err) {
-                job.failJob(err.message || 'Report generation failed');
-                await this.reportJobRepo.save(job);
+            catch {
+                // Fallback gracefully
             }
-        }, 50);
+        }
+        // Persistent asynchronous job queue dispatch (GAP-008 / TASK-04-01)
+        await this.reportQueue.enqueue({
+            jobId,
+            projectId: dto.projectId,
+            campaignId: dto.campaignId,
+            reportType: determinedReportType,
+            format: dto.format,
+            nodeId: dto.nodeId || dto.scopeFilter?.nodeId,
+            scopeType: dto.scopeType || (dto.nodeId ? 'DEPARTMENT' : 'ORGANIZATION'),
+            scopeFilter: dto.scopeFilter || (dto.nodeId ? { nodeId: dto.nodeId } : undefined),
+            title: dto.title,
+            includeAiSentimentSummary: dto.includeAiSentimentSummary ?? true,
+            includeBenchmarkComparison: dto.includeBenchmarkComparison ?? true,
+            passwordProtected: dto.passwordProtected ?? (!!dto.pdfPassword),
+            pdfPassword: dto.pdfPassword,
+            requestedBy,
+            branding,
+            benchmark,
+            bypassPrivacy: dto.bypassPrivacy,
+        });
+        // Trigger managed background queue worker
+        this.reportWorker.triggerProcessing();
         return {
             jobId,
             status: 'QUEUED',

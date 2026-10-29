@@ -1,3 +1,4 @@
+import { IKnowledgeRepository } from '../../domain/repositories/knowledge.repository.interface';
 export interface PolicyDocument {
     documentId: string;
     projectId: string;
@@ -13,7 +14,8 @@ export interface PolicyMatchResult {
     policyAlignedActionSteps: string[];
 }
 export declare class KnowledgeEngineUseCase {
-    private static policyStore;
+    private repository;
+    constructor(repository?: IKnowledgeRepository);
     ingestPolicyDocument(projectId: string, title: string, category: PolicyDocument['category'], content: string): Promise<PolicyDocument>;
     matchPolicyContext(projectId: string, topicOrGroupId: string): Promise<PolicyMatchResult[]>;
 }

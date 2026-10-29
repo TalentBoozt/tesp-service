@@ -24,6 +24,7 @@ function createConsultantRouter(repository) {
         auth_middleware_1.UserRole.HR_MANAGER,
         auth_middleware_1.UserRole.DEPARTMENT_MANAGER,
     ];
+    router.get('/consultant/workspace', (0, auth_middleware_1.authorize)(consultantRoles), controller.getWorkspace);
     router.get('/consultant/engagements', (0, auth_middleware_1.authorize)(consultantRoles), controller.getEngagements);
     router.get('/consultant/benchmarks', (0, auth_middleware_1.authorize)(consultantRoles), controller.getBenchmarks);
     router.get('/consultant/workshops', (0, auth_middleware_1.authorize)(consultantRoles), controller.getWorkshops);

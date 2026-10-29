@@ -12,6 +12,7 @@ exports.RequestReportGenerationDtoSchema = zod_1.z.object({
         'DEPT_BREAKDOWN_PDF',
         'RAW_RESPONSES_XLSX',
         'AGGREGATED_SCORES_XLSX',
+        'BOARDROOM_DECK_POWERPOINT',
         'SCOPED_REPORT',
     ]).optional(),
     format: zod_1.z.enum(['PDF', 'EXCEL', 'POWERPOINT', 'WEB']).optional(),
@@ -28,5 +29,6 @@ exports.RequestReportGenerationDtoSchema = zod_1.z.object({
     includeBenchmarkComparison: zod_1.z.boolean().optional(),
     passwordProtected: zod_1.z.boolean().optional(),
     pdfPassword: zod_1.z.string().optional(),
+    bypassPrivacy: zod_1.z.boolean().optional(),
 });
 //# sourceMappingURL=report-job.dto.js.map

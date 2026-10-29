@@ -75,11 +75,27 @@ class EmailGatewayService {
             };
         }
         // SIMULATED fallback
+        if (provider === 'SIMULATED') {
+            if (process.env.NODE_ENV === 'production') {
+                return {
+                    success: false,
+                    provider: 'SIMULATED',
+                    detail: 'Simulated email provider is prohibited in production environment. Please configure an authentic SMTP or ZeptoMail CPaaS provider.',
+                    error: 'SIMULATED_PROVIDER_PROHIBITED_IN_PROD',
+                };
+            }
+            return {
+                success: true,
+                messageId: `sim_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`,
+                provider: 'SIMULATED',
+                detail: `Simulated dispatch to ${options.to.length} recipient(s) [From: ${emailConfig.fromEmail}]`,
+            };
+        }
         return {
-            success: true,
-            messageId: `sim_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`,
-            provider: 'SIMULATED',
-            detail: `Simulated dispatch to ${options.to.length} recipient(s) [From: ${emailConfig.fromEmail}]`,
+            success: false,
+            provider: provider || 'UNKNOWN',
+            detail: `Unsupported or unconfigured email provider: ${provider}`,
+            error: `UNSUPPORTED_PROVIDER_${provider}`,
         };
     }
     /**

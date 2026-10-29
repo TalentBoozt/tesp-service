@@ -8,7 +8,14 @@ const ReportJobSchema = new mongoose_1.Schema({
     jobId: { type: String, required: true, unique: true, index: true },
     reportType: {
         type: String,
-        enum: ['EXEC_SUMMARY_PDF', 'DEPT_BREAKDOWN_PDF', 'RAW_RESPONSES_XLSX', 'AGGREGATED_SCORES_XLSX'],
+        enum: [
+            'EXEC_SUMMARY_PDF',
+            'DEPT_BREAKDOWN_PDF',
+            'RAW_RESPONSES_XLSX',
+            'AGGREGATED_SCORES_XLSX',
+            'BOARDROOM_DECK_POWERPOINT',
+            'SCOPED_REPORT',
+        ],
         required: true,
     },
     nodeId: { type: String },

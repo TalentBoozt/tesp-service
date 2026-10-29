@@ -27,13 +27,15 @@ function createEmployeeRouter(employeeRepo, orgNodeRepo, surveyHistoryUseCase, h
     const listEmployeesUseCase = new list_employees_use_case_1.ListEmployeesUseCase(repo);
     const terminateEmployeeUseCase = new terminate_employee_use_case_1.TerminateEmployeeUseCase(repo);
     const getEmployeeSurveyHistory = surveyHistoryUseCase || new get_employee_survey_history_use_case_1.GetEmployeeSurveyHistoryUseCase();
-    const manageHris = hrisConfigUseCase || new manage_hris_config_use_case_1.ManageHrisConfigUseCase();
+    const manageHris = hrisConfigUseCase || new manage_hris_config_use_case_1.ManageHrisConfigUseCase(repo);
     const controller = new employee_controller_1.EmployeeController(createEmployeeUseCase, updateEmployeeUseCase, bulkImportEmployeesUseCase, getEmployeeUseCase, getDemographicSnapshotUseCase, listEmployeesUseCase, terminateEmployeeUseCase, getEmployeeSurveyHistory, manageHris);
     router.use(['/employees', '/internal/employees'], auth_middleware_1.authenticate);
     // HRIS Integration Endpoints (Must precede /employees/:employeeId)
     router.get('/employees/hris-config', (0, auth_middleware_1.authorize)([auth_middleware_1.UserRole.SUPER_ADMIN, auth_middleware_1.UserRole.PROJECT_ADMIN, auth_middleware_1.UserRole.CONSULTANT_DAASH, auth_middleware_1.UserRole.ORG_ADMIN, auth_middleware_1.UserRole.HR_MANAGER]), controller.getHrisConfig);
     router.put('/employees/hris-config', (0, auth_middleware_1.authorize)([auth_middleware_1.UserRole.SUPER_ADMIN, auth_middleware_1.UserRole.PROJECT_ADMIN, auth_middleware_1.UserRole.CONSULTANT_DAASH, auth_middleware_1.UserRole.ORG_ADMIN, auth_middleware_1.UserRole.HR_MANAGER]), controller.updateHrisConfig);
     router.post('/employees/hris-sync', (0, auth_middleware_1.authorize)([auth_middleware_1.UserRole.SUPER_ADMIN, auth_middleware_1.UserRole.PROJECT_ADMIN, auth_middleware_1.UserRole.CONSULTANT_DAASH, auth_middleware_1.UserRole.ORG_ADMIN, auth_middleware_1.UserRole.HR_MANAGER]), controller.syncHris);
+    // Employee Portal "My Surveys" Endpoint (Accessible by Employee role or authenticated users)
+    router.get('/employees/me/surveys', controller.getMySurveys);
     // Survey Participation History Endpoint
     router.get('/employees/:employeeId/survey-history', (0, auth_middleware_1.authorize)([auth_middleware_1.UserRole.SUPER_ADMIN, auth_middleware_1.UserRole.PROJECT_ADMIN, auth_middleware_1.UserRole.CONSULTANT_DAASH, auth_middleware_1.UserRole.ORG_ADMIN, auth_middleware_1.UserRole.HR_MANAGER, auth_middleware_1.UserRole.DEPARTMENT_MANAGER]), controller.getSurveyHistory);
     router.post('/employees', (0, auth_middleware_1.authorize)([auth_middleware_1.UserRole.SUPER_ADMIN, auth_middleware_1.UserRole.PROJECT_ADMIN, auth_middleware_1.UserRole.CONSULTANT_DAASH, auth_middleware_1.UserRole.ORG_ADMIN, auth_middleware_1.UserRole.HR_MANAGER]), controller.createEmployee);

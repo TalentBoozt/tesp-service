@@ -6,12 +6,46 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.AiCopilotUseCase = void 0;
 const mongoose_1 = __importDefault(require("mongoose"));
 const campaign_schema_1 = require("../../../survey-distribution/infrastructure/persistence/mongoose/campaign.schema");
+const openai_gemini_adapter_1 = require("../adapters/openai-gemini.adapter");
 class AiCopilotUseCase {
     responseRepo;
     aiInsightRepo;
-    constructor(responseRepo, aiInsightRepo) {
+    llmAdapter;
+    constructor(responseRepo, aiInsightRepo, llmAdapter = new openai_gemini_adapter_1.OpenAiGeminiAdapter()) {
         this.responseRepo = responseRepo;
         this.aiInsightRepo = aiInsightRepo;
+        this.llmAdapter = llmAdapter;
+    }
+    async generateSummary(projectId, campaignId, nodeId = 'GLOBAL') {
+        if (!this.llmAdapter.isConfigured()) {
+            return {
+                status: 'UNAVAILABLE',
+                message: 'AI summary generation is not configured for this environment. Please configure OPENAI_API_KEY or GEMINI_API_KEY.',
+            };
+        }
+        let comments = [];
+        if (this.responseRepo) {
+            try {
+                const { responses } = await this.responseRepo.findAllByCampaign(projectId, campaignId, { limit: 1000 });
+                for (const r of responses) {
+                    if (!r.isDeleted && (!nodeId || nodeId === 'GLOBAL' || r.nodeId === nodeId)) {
+                        for (const ans of r.answers) {
+                            if (ans.textValue && typeof ans.textValue === 'string' && ans.textValue.trim().length > 0) {
+                                comments.push(ans.textValue.trim());
+                            }
+                        }
+                    }
+                }
+            }
+            catch (err) {
+                console.warn('Failed to fetch responses for AI summary:', err);
+            }
+        }
+        const summary = await this.llmAdapter.generateExecutiveSummary(nodeId, comments);
+        return {
+            status: 'CONFIGURED',
+            summary,
+        };
     }
     async execute(request) {
         const q = request.query.toLowerCase();

@@ -13,6 +13,8 @@ class OrgNodeEntity {
     _depth;
     _displayOrder;
     _status;
+    _headCount;
+    _directHeadCount;
     _attributes;
     _version;
     _isDeleted;
@@ -40,6 +42,8 @@ class OrgNodeEntity {
         this._depth = props.depth ?? (this._path.split(',').filter(Boolean).length);
         this._displayOrder = props.displayOrder ?? 0;
         this._status = props.status || 'ACTIVE';
+        this._headCount = props.headCount;
+        this._directHeadCount = props.directHeadCount;
         this._attributes = props.attributes || {};
         this._version = props.version || 1;
         this._isDeleted = props.isDeleted ?? false;
@@ -134,7 +138,23 @@ class OrgNodeEntity {
         this._version += 1;
         this._updatedAt = new Date();
     }
+    get headCount() {
+        return this._headCount ?? (this._attributes?.Headcount ? Number(this._attributes.Headcount) : 0);
+    }
+    get directHeadCount() {
+        return this._directHeadCount ?? this.headCount;
+    }
+    setHeadCount(totalCount, directCount) {
+        this._headCount = totalCount;
+        this._directHeadCount = directCount !== undefined ? directCount : totalCount;
+        this._attributes = {
+            ...this._attributes,
+            Headcount: totalCount,
+        };
+    }
     toJSON() {
+        const totalHeadCount = this._headCount ?? (this._attributes?.Headcount ? Number(this._attributes.Headcount) : 0);
+        const directHeadCount = this._directHeadCount ?? totalHeadCount;
         return {
             projectId: this.projectId,
             nodeId: this.nodeId,
@@ -145,7 +165,12 @@ class OrgNodeEntity {
             depth: this._depth,
             displayOrder: this._displayOrder,
             status: this._status,
-            attributes: this._attributes,
+            headCount: totalHeadCount,
+            directHeadCount: directHeadCount,
+            attributes: {
+                ...this._attributes,
+                Headcount: totalHeadCount,
+            },
             version: this._version,
             isDeleted: this._isDeleted,
             createdAt: this.createdAt,

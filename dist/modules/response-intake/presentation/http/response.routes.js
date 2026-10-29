@@ -13,17 +13,22 @@ const redis_token_repository_1 = require("../../../survey-distribution/infrastru
 const token_vault_repository_1 = require("../../../survey-distribution/infrastructure/persistence/mongoose/token-vault.repository");
 const campaign_repository_1 = require("../../../survey-distribution/infrastructure/persistence/mongoose/campaign.repository");
 const survey_repository_1 = require("../../../survey/infrastructure/persistence/mongoose/survey.repository");
-function createResponseIntakeRouter(responseRepo, tokenBurnUseCase, surveyRepo) {
+const get_survey_instrument_use_case_1 = require("../../application/use-cases/get-survey-instrument.use-case");
+function createResponseIntakeRouter(responseRepo, tokenBurnUseCase, surveyRepo, campaignRepo) {
     const router = (0, express_1.Router)();
     const rRepo = responseRepo || new survey_response_repository_1.SurveyResponseMongoRepository();
+    const cRepo = campaignRepo || (process.env.NODE_ENV === 'test' ? undefined : new campaign_repository_1.SurveyCampaignMongoRepository());
     const tBurnUseCase = tokenBurnUseCase ||
-        new validate_and_burn_token_use_case_1.ValidateAndBurnTokenUseCase(new redis_token_repository_1.RedisTokenRepository(), new token_vault_repository_1.TokenVaultMongoRepository(), new campaign_repository_1.SurveyCampaignMongoRepository());
+        new validate_and_burn_token_use_case_1.ValidateAndBurnTokenUseCase(new redis_token_repository_1.RedisTokenRepository(), new token_vault_repository_1.TokenVaultMongoRepository(), cRepo);
     const sRepo = surveyRepo || new survey_repository_1.SurveyMongoRepository();
-    const submitSurveyResponseUseCase = new submit_survey_response_use_case_1.SubmitSurveyResponseUseCase(rRepo, tBurnUseCase, sRepo);
+    const submitSurveyResponseUseCase = new submit_survey_response_use_case_1.SubmitSurveyResponseUseCase(rRepo, tBurnUseCase, sRepo, cRepo);
     const getSurveyResponseUseCase = new get_survey_response_use_case_1.GetSurveyResponseUseCase(rRepo);
     const listSurveyResponsesUseCase = new list_survey_responses_use_case_1.ListSurveyResponsesUseCase(rRepo);
-    const controller = new response_controller_1.ResponseController(submitSurveyResponseUseCase, getSurveyResponseUseCase, listSurveyResponsesUseCase);
-    // Public / Respondent Ingestion Endpoint
+    const getSurveyInstrumentUseCase = new get_survey_instrument_use_case_1.GetSurveyInstrumentUseCase(sRepo, cRepo, tBurnUseCase);
+    const controller = new response_controller_1.ResponseController(submitSurveyResponseUseCase, getSurveyResponseUseCase, listSurveyResponsesUseCase, getSurveyInstrumentUseCase, tBurnUseCase);
+    // Public / Respondent Ingestion & Instrument Resolution Endpoints
+    router.get('/intake/instrument', controller.getSurveyInstrument);
+    router.get('/responses/instrument', controller.getSurveyInstrument);
     router.post('/responses', controller.submitResponse);
     // Protected Administration & Analytics Routes
     router.get('/responses', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([auth_middleware_1.UserRole.SUPER_ADMIN, auth_middleware_1.UserRole.PROJECT_ADMIN, auth_middleware_1.UserRole.CONSULTANT_DAASH, auth_middleware_1.UserRole.ORG_ADMIN, auth_middleware_1.UserRole.HR_MANAGER, auth_middleware_1.UserRole.REPORT_VIEWER]), controller.listResponses);

@@ -25,6 +25,8 @@ export interface IAiInsightDocument extends Document {
         overriddenAt: Date;
     };
     processedAt: Date;
+    isAiSimulated?: boolean;
+    fallbackReason?: string;
 }
 export declare const AiInsightModel: import("mongoose").Model<IAiInsightDocument, {}, {}, {}, Document<unknown, {}, IAiInsightDocument, {}, {}> & IAiInsightDocument & Required<{
     _id: import("mongoose").Types.ObjectId;

@@ -11,7 +11,9 @@
     "test:watch": "vitest",
     "lint": "tsc --noEmit",
     "seed": "ts-node-dev --transpile-only src/shared/infrastructure/database/seed.ts",
-    "smoke-test": "node scripts/production-smoke-test.js"
+    "db:seed": "ts-node src/shared/infrastructure/database/seeds/demo-seed.ts",
+    "smoke-test": "node scripts/production-smoke-test.js",
+    "cert:e2e": "node scripts/e2e-production-readiness-cert.js"
   },
   "keywords": [],
   "author": "Talnova Engineering",
@@ -21,6 +23,7 @@
     "bcrypt": "^6.0.0",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
+    "exceljs": "^4.4.0",
     "express": "^4.19.2",
     "express-rate-limit": "^8.7.1",
     "helmet": "^7.1.0",
@@ -28,6 +31,8 @@
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.3.1",
     "nodemailer": "^10.2.0",
+    "pdfkit": "^0.20.2",
+    "pptxgenjs": "^4.0.1",
     "zod": "^3.22.4"
   },
   "devDependencies": {
@@ -36,6 +41,7 @@
     "@types/jsonwebtoken": "^9.0.6",
     "@types/node": "^20.12.7",
     "@types/nodemailer": "^8.0.2",
+    "@types/pdfkit": "^0.17.7",
     "@types/supertest": "^6.0.2",
     "supertest": "^6.3.4",
     "ts-node-dev": "^2.0.0",

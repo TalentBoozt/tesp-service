@@ -7,5 +7,7 @@ export interface ProtectedMetricResult {
 }
 export declare class PrivacyGuardService {
     static MIN_THRESHOLD: number;
-    applyPrivacyGuard(responseCount: number, computedEnps: number, computedEngagementIndex: number): ProtectedMetricResult;
+    applyPrivacyGuard(responseCount: number, computedEnps: number | null, computedEngagementIndex: number | null): ProtectedMetricResult;
+    canExposeCohort(responseCount: number): boolean;
+    getMinCohortSize(): number;
 }

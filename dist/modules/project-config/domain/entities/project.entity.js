@@ -18,6 +18,9 @@ class ProjectEntity {
     _customAttributeDefinitions;
     _aiConfig;
     _emailConfig;
+    _customDomain;
+    _samlConfig;
+    _benchmarkSettings;
     _version;
     _isDeleted;
     createdAt;
@@ -52,6 +55,34 @@ class ProjectEntity {
             fromName: `${props.name.trim()} Engagement Team`,
             fromEmail: 'no-reply@talnova.io',
         });
+        if (props.customDomain) {
+            this._customDomain = {
+                hostname: props.customDomain.hostname || '',
+                verified: props.customDomain.verified ?? false,
+                verifiedAt: props.customDomain.verifiedAt,
+                cnameTarget: props.customDomain.cnameTarget,
+                sslStatus: props.customDomain.sslStatus || 'PENDING_DNS',
+            };
+        }
+        if (props.samlConfig) {
+            this._samlConfig = {
+                enabled: props.samlConfig.enabled ?? false,
+                protocol: props.samlConfig.protocol || 'SAML_2',
+                issuerUrl: props.samlConfig.issuerUrl,
+                clientIdOrEntityId: props.samlConfig.clientIdOrEntityId,
+                metadataUrlOrCert: props.samlConfig.metadataUrlOrCert,
+                enforceSsoOnly: props.samlConfig.enforceSsoOnly ?? false,
+                ssoLoginUrl: props.samlConfig.ssoLoginUrl,
+            };
+        }
+        if (props.benchmarkSettings) {
+            this._benchmarkSettings = {
+                overallScoreBenchmark: props.benchmarkSettings.overallScoreBenchmark,
+                dimensionBenchmarks: props.benchmarkSettings.dimensionBenchmarks
+                    ? { ...props.benchmarkSettings.dimensionBenchmarks }
+                    : undefined,
+            };
+        }
         this._version = props.version || 1;
         this._isDeleted = props.isDeleted ?? false;
         this.createdAt = props.createdAt || new Date();
@@ -187,6 +218,50 @@ class ProjectEntity {
             defaultLocale: this._defaultLocale,
         };
     }
+    get customDomain() {
+        return this._customDomain;
+    }
+    get samlConfig() {
+        return this._samlConfig;
+    }
+    get benchmarkSettings() {
+        return this._benchmarkSettings;
+    }
+    updateBenchmarkSettings(settings) {
+        if (this._isDeleted) {
+            throw new Error('Cannot update benchmark settings for a soft-deleted project.');
+        }
+        this._benchmarkSettings = {
+            ...this._benchmarkSettings,
+            ...settings,
+        };
+        this._version += 1;
+        this._updatedAt = new Date();
+    }
+    updateCustomDomain(domain) {
+        this._customDomain = {
+            hostname: domain.hostname ?? this._customDomain?.hostname ?? '',
+            verified: domain.verified ?? this._customDomain?.verified ?? false,
+            verifiedAt: domain.verifiedAt ?? this._customDomain?.verifiedAt,
+            cnameTarget: domain.cnameTarget ?? this._customDomain?.cnameTarget,
+            sslStatus: domain.sslStatus ?? this._customDomain?.sslStatus ?? 'PENDING_DNS',
+        };
+        this._version += 1;
+        this._updatedAt = new Date();
+    }
+    updateSamlConfig(saml) {
+        this._samlConfig = {
+            enabled: saml.enabled ?? this._samlConfig?.enabled ?? false,
+            protocol: saml.protocol ?? this._samlConfig?.protocol ?? 'SAML_2',
+            issuerUrl: saml.issuerUrl ?? this._samlConfig?.issuerUrl,
+            clientIdOrEntityId: saml.clientIdOrEntityId ?? this._samlConfig?.clientIdOrEntityId,
+            metadataUrlOrCert: saml.metadataUrlOrCert ?? this._samlConfig?.metadataUrlOrCert,
+            enforceSsoOnly: saml.enforceSsoOnly ?? this._samlConfig?.enforceSsoOnly ?? false,
+            ssoLoginUrl: saml.ssoLoginUrl ?? this._samlConfig?.ssoLoginUrl,
+        };
+        this._version += 1;
+        this._updatedAt = new Date();
+    }
     toJSON() {
         return {
             projectId: this.projectId,
@@ -199,6 +274,9 @@ class ProjectEntity {
             customAttributeDefinitions: this._customAttributeDefinitions.map((attr) => attr.toJSON()),
             aiConfig: this._aiConfig.toJSON(),
             emailConfig: this._emailConfig.toJSON(),
+            customDomain: this._customDomain,
+            samlConfig: this._samlConfig,
+            benchmarkSettings: this._benchmarkSettings,
             version: this._version,
             isDeleted: this._isDeleted,
             createdAt: this.createdAt,

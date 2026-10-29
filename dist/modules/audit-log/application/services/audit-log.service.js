@@ -63,8 +63,12 @@ class AuditLogService {
         const eventType = event.eventType;
         let action = eventType;
         let resourceType = 'SYSTEM';
-        const projectId = event.payload?.projectId || (event.aggregateId?.startsWith('PRJ-') ? event.aggregateId : 'PRJ-99201');
-        const actorId = event.payload?.actorId || event.payload?.authorId || 'USR-ADMIN';
+        const projectId = event.payload?.projectId || (event.aggregateId?.startsWith('PRJ-') ? event.aggregateId : null);
+        if (!projectId) {
+            console.warn(`[AuditLogService] Discarding event '${eventType}' without tenant project context`);
+            return;
+        }
+        const actorId = event.payload?.actorId || event.payload?.authorId || 'SYSTEM';
         const actorRole = event.payload?.actorRole || 'PROJECT_ADMIN';
         if (eventType.includes('SURVEY_PUBLISHED')) {
             action = 'SURVEY_PUBLISHED';
@@ -114,6 +118,10 @@ class AuditLogService {
             action = eventType;
             resourceType = 'ORGANIZATION';
         }
+        else if (eventType.includes('ACTION_PLAN')) {
+            action = eventType;
+            resourceType = 'ACTION_PLAN';
+        }
         await this.recordAuditLog({
             eventId: event.eventId || crypto_1.default.randomUUID(),
             projectId,
@@ -132,7 +140,7 @@ class AuditLogService {
         const limit = Math.min(100, Math.max(1, Number(params.limit) || 20));
         const skip = (page - 1) * limit;
         if (mongoose_1.default.connection?.readyState !== 1) {
-            let filtered = this.getFallbackSeedLogs(params.projectId || 'PRJ-99201');
+            let filtered = params.projectId ? this.getFallbackSeedLogs(params.projectId) : [];
             if (params.action && params.action !== 'ALL') {
                 filtered = filtered.filter(item => item.action === params.action);
             }
@@ -157,8 +165,6 @@ class AuditLogService {
                 data: filtered.slice(skip, skip + limit),
             };
         }
-        // Auto-seed if collection is empty
-        await this.ensureSeedData(params.projectId || 'PRJ-99201');
         const filter = {};
         if (params.projectId && params.projectId !== 'ALL') {
             filter.projectId = params.projectId;
@@ -222,7 +228,7 @@ class AuditLogService {
             data,
         };
     }
-    async ensureSeedData(projectId) {
+    async seedDefaultsIfEmpty(projectId) {
         try {
             const count = await audit_log_schema_1.AuditLogModel.countDocuments({ projectId });
             if (count >= 5)

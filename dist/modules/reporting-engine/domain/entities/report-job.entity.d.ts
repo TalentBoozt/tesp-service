@@ -1,4 +1,4 @@
-export type ReportType = 'EXEC_SUMMARY_PDF' | 'DEPT_BREAKDOWN_PDF' | 'RAW_RESPONSES_XLSX' | 'AGGREGATED_SCORES_XLSX';
+export type ReportType = 'EXEC_SUMMARY_PDF' | 'DEPT_BREAKDOWN_PDF' | 'RAW_RESPONSES_XLSX' | 'AGGREGATED_SCORES_XLSX' | 'BOARDROOM_DECK_POWERPOINT' | 'SCOPED_REPORT';
 export type JobStatus = 'QUEUED' | 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'READY' | 'FAILED';
 export interface ReportJobProps {
     projectId: string;
@@ -11,6 +11,7 @@ export interface ReportJobProps {
     downloadUrl?: string;
     expiresAt?: Date;
     errorMessage?: string;
+    failureReason?: string;
     fileSizeBytes?: number;
     createdAt?: Date;
     completedAt?: Date;
@@ -32,6 +33,8 @@ export declare class ReportJobEntity {
     constructor(props: ReportJobProps);
     private validateJobId;
     completeJob(downloadUrl: string, expiresAt: Date, fileSizeBytes?: number): void;
+    get failureReason(): string | undefined;
+    set failureReason(val: string | undefined);
     failJob(errorMessage: string): void;
     toJSON(): ReportJobProps;
 }

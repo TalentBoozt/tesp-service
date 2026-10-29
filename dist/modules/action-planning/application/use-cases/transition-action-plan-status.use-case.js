@@ -4,12 +4,15 @@ exports.TransitionActionPlanStatusUseCase = void 0;
 const action_state_machine_service_1 = require("../../domain/services/action-state-machine.service");
 const score_delta_evaluator_service_1 = require("../../domain/services/score-delta-evaluator.service");
 const action_plan_status_changed_event_1 = require("../../domain/events/action-plan-status-changed.event");
+const event_bus_1 = require("../../../../shared/domain/events/event-bus");
 class TransitionActionPlanStatusUseCase {
     actionPlanRepo;
+    eventBus;
     stateMachine;
     scoreEvaluator;
-    constructor(actionPlanRepo) {
+    constructor(actionPlanRepo, eventBus = event_bus_1.DomainEventBus.getInstance()) {
         this.actionPlanRepo = actionPlanRepo;
+        this.eventBus = eventBus;
         this.stateMachine = new action_state_machine_service_1.ActionStateMachineService();
         this.scoreEvaluator = new score_delta_evaluator_service_1.ScoreDeltaEvaluatorService();
     }
@@ -39,7 +42,7 @@ class TransitionActionPlanStatusUseCase {
         actionPlan.updatedAt = new Date();
         const saved = await this.actionPlanRepo.save(actionPlan);
         // 3. Emit Domain Event (FR-ACT-008)
-        new action_plan_status_changed_event_1.ActionPlanStatusChangedEvent({
+        const event = new action_plan_status_changed_event_1.ActionPlanStatusChangedEvent({
             projectId,
             campaignId: actionPlan.campaignId,
             actionPlanId,
@@ -48,6 +51,7 @@ class TransitionActionPlanStatusUseCase {
             newStatus: targetStatus,
             actorId,
         });
+        await this.eventBus.publish(event);
         return saved;
     }
 }

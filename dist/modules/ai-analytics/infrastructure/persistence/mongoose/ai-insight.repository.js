@@ -19,6 +19,8 @@ class AiInsightMongoRepository {
             themes: doc.themes,
             riskFlags: doc.riskFlags,
             humanOverride: doc.humanOverride,
+            isAiSimulated: doc.isAiSimulated,
+            fallbackReason: doc.fallbackReason,
             processedAt: doc.processedAt,
         });
     }
@@ -37,6 +39,8 @@ class AiInsightMongoRepository {
                 themes: raw.themes,
                 riskFlags: raw.riskFlags,
                 humanOverride: raw.humanOverride,
+                isAiSimulated: raw.isAiSimulated,
+                fallbackReason: raw.fallbackReason,
                 processedAt: raw.processedAt,
             },
             $setOnInsert: {

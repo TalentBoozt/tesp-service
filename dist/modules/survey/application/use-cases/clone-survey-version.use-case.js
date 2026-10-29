@@ -19,7 +19,7 @@ class CloneSurveyVersionUseCase {
         }
         const draftClone = existing.createDraftClone();
         const savedClone = await this.surveyRepo.save(draftClone);
-        this.eventBus.publish(new survey_events_1.SurveyClonedEvent(surveyId, {
+        await this.eventBus.publish(new survey_events_1.SurveyClonedEvent(surveyId, {
             projectId,
             surveyId,
             newVersion: savedClone.version,

@@ -8,4 +8,5 @@ export declare class TokenVaultMongoRepository implements ITokenVaultRepository 
     findTokensByCampaign(projectId: string, campaignId: string): Promise<TokenVaultEntity[]>;
     findUnburnedByEmployee(projectId: string, employeeId: string): Promise<TokenVaultEntity[]>;
     burnToken(token: string): Promise<boolean>;
+    restoreToken(token: string): Promise<boolean>;
 }

@@ -39,7 +39,7 @@ export declare class AuditLogService {
     recordAuditLog(props: AuditLogProps): Promise<AuditLogDocument | null>;
     private handleDomainEvent;
     queryLogs(params: AuditLogQueryParams): Promise<AuditLogQueryResult>;
-    private ensureSeedData;
+    seedDefaultsIfEmpty(projectId: string): Promise<void>;
     getFallbackSeedLogs(projectId: string): ({
         id: string;
         eventId: string;

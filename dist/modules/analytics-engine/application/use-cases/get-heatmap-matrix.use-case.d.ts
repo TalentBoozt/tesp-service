@@ -24,5 +24,5 @@ export declare class GetHeatmapMatrixUseCase {
     private privacyGuard;
     private engagementCalculator;
     constructor(responseRepo: ISurveyResponseRepository);
-    execute(projectId: string, campaignId: string, parentNodeId?: string): Promise<HeatmapMatrixResult>;
+    execute(projectId: string, campaignId: string, parentNodeId?: string, bypassPrivacy?: boolean): Promise<HeatmapMatrixResult>;
 }

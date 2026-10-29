@@ -17,13 +17,18 @@ class ListActionPlansUseCase {
             APPROVED: [],
             REJECTED: [],
             IN_PROGRESS: [],
+            ACTIVE: [],
             COMPLETED: [],
             VERIFIED: [],
             CANCELLED: [],
         };
         for (const plan of plans) {
-            if (kanban[plan.status]) {
-                kanban[plan.status].push(plan);
+            const statusKey = plan.status;
+            if (kanban[statusKey]) {
+                kanban[statusKey].push(plan);
+            }
+            if (plan.status === 'ACTIVE') {
+                kanban.IN_PROGRESS.push(plan);
             }
         }
         return kanban;

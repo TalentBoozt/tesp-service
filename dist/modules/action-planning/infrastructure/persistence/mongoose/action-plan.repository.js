@@ -1,6 +1,10 @@
 "use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ActionPlanMongoRepository = void 0;
+const mongoose_1 = __importDefault(require("mongoose"));
 const action_plan_entity_1 = require("../../../domain/entities/action-plan.entity");
 const action_plan_schema_1 = require("./action-plan.schema");
 class ActionPlanMongoRepository {
@@ -26,6 +30,7 @@ class ActionPlanMongoRepository {
                 status: m.status,
                 dueDate: m.dueDate,
                 completed: m.completed !== undefined ? Boolean(m.completed) : m.status === 'COMPLETED',
+                alertState: m.alertState || 'NONE',
             })),
             externalSync: doc.externalSync ? (doc.externalSync.toObject ? doc.externalSync.toObject() : doc.externalSync) : undefined,
             isDeleted: doc.isDeleted,
@@ -62,6 +67,19 @@ class ActionPlanMongoRepository {
     }
     async findByActionPlanId(projectId, actionPlanId) {
         const doc = await action_plan_schema_1.ActionPlanModel.findOne({ projectId, actionPlanId, isDeleted: false });
+        if (!doc)
+            return null;
+        return this.toEntity(doc);
+    }
+    async findByExternalTaskId(projectId, externalTaskId) {
+        const doc = await action_plan_schema_1.ActionPlanModel.findOne({
+            projectId,
+            $or: [
+                { 'externalSync.externalTaskId': externalTaskId },
+                { 'externalSync.externalKey': externalTaskId },
+            ],
+            isDeleted: false,
+        });
         if (!doc)
             return null;
         return this.toEntity(doc);
@@ -110,6 +128,23 @@ class ActionPlanMongoRepository {
             return null;
         }
         return this.toEntity(doc);
+    }
+    async findActivePlansWithDueMilestones(cutoffDate) {
+        if (mongoose_1.default.connection?.readyState !== 1) {
+            return [];
+        }
+        const docs = await action_plan_schema_1.ActionPlanModel.find({
+            isDeleted: false,
+            status: { $nin: ['COMPLETED', 'CANCELLED', 'REJECTED'] },
+            milestones: {
+                $elemMatch: {
+                    status: { $ne: 'COMPLETED' },
+                    completed: { $ne: true },
+                    dueDate: { $lte: cutoffDate },
+                },
+            },
+        });
+        return docs.map((doc) => this.toEntity(doc));
     }
 }
 exports.ActionPlanMongoRepository = ActionPlanMongoRepository;

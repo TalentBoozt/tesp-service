@@ -152,7 +152,7 @@ function createConsultingFirmRouter(firmRepo = new mongo_consulting_firm_reposit
                 return res.status(200).json({
                     firmId: null,
                     firmName: 'Unassigned Advisory Firm',
-                    assignedProjectIds: [req.user?.projectId || 'PRJ-99201'],
+                    assignedProjectIds: req.user?.projectId ? [req.user.projectId] : [],
                 });
             }
             return res.status(200).json({

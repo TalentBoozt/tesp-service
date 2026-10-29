@@ -64,7 +64,7 @@ class BulkImportEmployeesUseCase {
             summary.terminated = terminatedCount;
         }
         // Publish Event
-        this.eventBus.publish(new employee_events_1.EmployeeBulkImportCompletedEvent(projectId, {
+        await this.eventBus.publish(new employee_events_1.EmployeeBulkImportCompletedEvent(projectId, {
             projectId,
             totalRecords: summary.totalRecords,
             inserted: summary.inserted,

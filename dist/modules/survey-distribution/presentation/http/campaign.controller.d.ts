@@ -9,6 +9,8 @@ import { GetOptimalDispatchTimeUseCase } from '../../application/use-cases/get-o
 import { GenerateKioskPinsUseCase } from '../../application/use-cases/generate-kiosk-pins.use-case';
 import { GetCampaignKioskRosterUseCase } from '../../application/use-cases/get-campaign-kiosk-roster.use-case';
 import { GetMySurveysUseCase } from '../../application/use-cases/get-my-surveys.use-case';
+import { CompleteCampaignUseCase } from '../../application/use-cases/complete-campaign.use-case';
+import { DeleteCampaignUseCase } from '../../application/use-cases/delete-campaign.use-case';
 export declare class CampaignController {
     private launchCampaignUseCase;
     private getCampaignMetricsUseCase;
@@ -20,7 +22,9 @@ export declare class CampaignController {
     private generateKioskPinsUseCase?;
     private getCampaignKioskRosterUseCase?;
     private getMySurveysUseCase?;
-    constructor(launchCampaignUseCase: LaunchCampaignUseCase, getCampaignMetricsUseCase: GetCampaignMetricsUseCase, listCampaignsUseCase: ListCampaignsUseCase, dispatchRemindersUseCase: DispatchRemindersUseCase, validateAndBurnTokenUseCase: ValidateAndBurnTokenUseCase, handleDeliveryWebhookUseCase: HandleDeliveryWebhookUseCase, getOptimalDispatchTimeUseCase: GetOptimalDispatchTimeUseCase, generateKioskPinsUseCase?: GenerateKioskPinsUseCase | undefined, getCampaignKioskRosterUseCase?: GetCampaignKioskRosterUseCase | undefined, getMySurveysUseCase?: GetMySurveysUseCase | undefined);
+    private completeCampaignUseCase?;
+    private deleteCampaignUseCase?;
+    constructor(launchCampaignUseCase: LaunchCampaignUseCase, getCampaignMetricsUseCase: GetCampaignMetricsUseCase, listCampaignsUseCase: ListCampaignsUseCase, dispatchRemindersUseCase: DispatchRemindersUseCase, validateAndBurnTokenUseCase: ValidateAndBurnTokenUseCase, handleDeliveryWebhookUseCase: HandleDeliveryWebhookUseCase, getOptimalDispatchTimeUseCase: GetOptimalDispatchTimeUseCase, generateKioskPinsUseCase?: GenerateKioskPinsUseCase | undefined, getCampaignKioskRosterUseCase?: GetCampaignKioskRosterUseCase | undefined, getMySurveysUseCase?: GetMySurveysUseCase | undefined, completeCampaignUseCase?: CompleteCampaignUseCase | undefined, deleteCampaignUseCase?: DeleteCampaignUseCase | undefined);
     launchCampaign: (req: Request, res: Response, next: NextFunction) => Promise<void>;
     getCampaignMetrics: (req: Request, res: Response, next: NextFunction) => Promise<void>;
     listCampaigns: (req: Request, res: Response, next: NextFunction) => Promise<void>;
@@ -28,8 +32,11 @@ export declare class CampaignController {
     generateKioskPins: (req: Request, res: Response, next: NextFunction) => Promise<void>;
     validateTokenOnly: (req: Request, res: Response, next: NextFunction) => Promise<void>;
     validateAndBurnToken: (req: Request, res: Response, next: NextFunction) => Promise<void>;
+    private verifyWebhookSignature;
     handleWebhook: (req: Request, res: Response, next: NextFunction) => Promise<void>;
     getOptimalDispatchTime: (req: Request, res: Response, next: NextFunction) => Promise<void>;
     getKioskRoster: (req: Request, res: Response, next: NextFunction) => Promise<void>;
     getMySurveys: (req: Request, res: Response, next: NextFunction) => Promise<void>;
+    completeCampaign: (req: Request, res: Response, next: NextFunction) => Promise<void>;
+    deleteCampaign: (req: Request, res: Response, next: NextFunction) => Promise<void>;
 }
