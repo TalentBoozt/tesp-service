@@ -5,6 +5,7 @@ export interface GenerateReportOptions {
     reportType: string;
     nodeId?: string;
     requestedBy?: string;
+    bypassPrivacy?: boolean;
 }
 export interface GeneratedReportResult {
     filePath: string;
@@ -14,6 +15,4 @@ export interface GeneratedReportResult {
 }
 export declare class CsvReportGenerator {
     generateReport(options: GenerateReportOptions): Promise<GeneratedReportResult>;
-    private createMinimalValidPdf;
-    private escapePdfText;
 }

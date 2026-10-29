@@ -5,6 +5,26 @@ import { EmailConfig, IEmailConfigProps } from '../value-objects/email-config.vo
 import { AiConfig, IAiConfigProps } from '../value-objects/ai-config.vo';
 export type ProjectStatus = 'DRAFT' | 'ACTIVE' | 'SUSPENDED' | 'ARCHIVED';
 export { IEmailConfigProps, IAiConfigProps };
+export interface ICustomDomainProps {
+    hostname: string;
+    verified: boolean;
+    verifiedAt?: Date;
+    cnameTarget?: string;
+    sslStatus?: 'ACTIVE' | 'PENDING_DNS' | 'FAILED';
+}
+export interface ISamlConfigProps {
+    enabled: boolean;
+    protocol?: 'SAML_2' | 'OIDC_PKCE';
+    issuerUrl?: string;
+    clientIdOrEntityId?: string;
+    metadataUrlOrCert?: string;
+    enforceSsoOnly?: boolean;
+    ssoLoginUrl?: string;
+}
+export interface IBenchmarkSettingsProps {
+    overallScoreBenchmark?: number;
+    dimensionBenchmarks?: Record<string, number>;
+}
 export interface IProjectProps {
     projectId: string;
     name: string;
@@ -16,6 +36,9 @@ export interface IProjectProps {
     customAttributeDefinitions?: ICustomAttributeDefinitionProps[];
     aiConfig?: Partial<IAiConfigProps>;
     emailConfig?: Partial<IEmailConfigProps>;
+    customDomain?: Partial<ICustomDomainProps>;
+    samlConfig?: Partial<ISamlConfigProps>;
+    benchmarkSettings?: Partial<IBenchmarkSettingsProps>;
     version?: number;
     isDeleted?: boolean;
     createdAt?: Date;
@@ -33,6 +56,9 @@ export declare class ProjectEntity {
     private _customAttributeDefinitions;
     private _aiConfig;
     private _emailConfig;
+    private _customDomain?;
+    private _samlConfig?;
+    private _benchmarkSettings?;
     private _version;
     private _isDeleted;
     readonly createdAt: Date;
@@ -72,6 +98,12 @@ export declare class ProjectEntity {
         logoUrl: string | undefined;
         defaultLocale: string;
     };
+    get customDomain(): ICustomDomainProps | undefined;
+    get samlConfig(): ISamlConfigProps | undefined;
+    get benchmarkSettings(): IBenchmarkSettingsProps | undefined;
+    updateBenchmarkSettings(settings: Partial<IBenchmarkSettingsProps>): void;
+    updateCustomDomain(domain: Partial<ICustomDomainProps>): void;
+    updateSamlConfig(saml: Partial<ISamlConfigProps>): void;
     toJSON(): {
         projectId: string;
         name: string;
@@ -83,6 +115,9 @@ export declare class ProjectEntity {
         customAttributeDefinitions: ICustomAttributeDefinitionProps[];
         aiConfig: IAiConfigProps;
         emailConfig: IEmailConfigProps;
+        customDomain: ICustomDomainProps | undefined;
+        samlConfig: ISamlConfigProps | undefined;
+        benchmarkSettings: IBenchmarkSettingsProps | undefined;
         version: number;
         isDeleted: boolean;
         createdAt: Date;

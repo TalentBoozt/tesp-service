@@ -17,24 +17,30 @@ const get_optimal_dispatch_time_use_case_1 = require("../../application/use-case
 const generate_kiosk_pins_use_case_1 = require("../../application/use-cases/generate-kiosk-pins.use-case");
 const get_campaign_kiosk_roster_use_case_1 = require("../../application/use-cases/get-campaign-kiosk-roster.use-case");
 const get_my_surveys_use_case_1 = require("../../application/use-cases/get-my-surveys.use-case");
+const complete_campaign_use_case_1 = require("../../application/use-cases/complete-campaign.use-case");
+const delete_campaign_use_case_1 = require("../../application/use-cases/delete-campaign.use-case");
 const campaign_controller_1 = require("./campaign.controller");
 const auth_middleware_1 = require("../../../../shared/presentation/middleware/auth.middleware");
+const employee_repository_1 = require("../../../employee/infrastructure/persistence/mongoose/employee.repository");
 function createCampaignRouter(campaignRepo, vaultRepo, redisRepo, surveyRepo, employeeRepo) {
     const router = (0, express_1.Router)();
     const cRepo = campaignRepo || new campaign_repository_1.SurveyCampaignMongoRepository();
     const vRepo = vaultRepo || new token_vault_repository_1.TokenVaultMongoRepository();
     const rRepo = redisRepo || new redis_token_repository_1.RedisTokenRepository();
-    const launchCampaignUseCase = new launch_campaign_use_case_1.LaunchCampaignUseCase(cRepo, vRepo, rRepo, surveyRepo, employeeRepo);
+    const eRepo = employeeRepo || new employee_repository_1.EmployeeMongoRepository();
+    const launchCampaignUseCase = new launch_campaign_use_case_1.LaunchCampaignUseCase(cRepo, vRepo, rRepo, surveyRepo, eRepo);
     const getCampaignMetricsUseCase = new get_campaign_metrics_use_case_1.GetCampaignMetricsUseCase(cRepo, token_vault_schema_1.TokenVaultModel, survey_response_schema_1.SurveyResponseModel);
     const listCampaignsUseCase = new list_campaigns_use_case_1.ListCampaignsUseCase(cRepo);
-    const dispatchRemindersUseCase = new dispatch_reminders_use_case_1.DispatchRemindersUseCase(cRepo, vRepo);
+    const dispatchRemindersUseCase = new dispatch_reminders_use_case_1.DispatchRemindersUseCase(cRepo, vRepo, eRepo);
     const validateAndBurnTokenUseCase = new validate_and_burn_token_use_case_1.ValidateAndBurnTokenUseCase(rRepo, vRepo, cRepo);
     const handleDeliveryWebhookUseCase = new handle_delivery_webhook_use_case_1.HandleDeliveryWebhookUseCase(cRepo);
     const getOptimalDispatchTimeUseCase = new get_optimal_dispatch_time_use_case_1.GetOptimalDispatchTimeUseCase();
     const generateKioskPinsUseCase = new generate_kiosk_pins_use_case_1.GenerateKioskPinsUseCase(vRepo, cRepo, rRepo);
     const getCampaignKioskRosterUseCase = new get_campaign_kiosk_roster_use_case_1.GetCampaignKioskRosterUseCase(cRepo, vRepo, employeeRepo);
     const getMySurveysUseCase = new get_my_surveys_use_case_1.GetMySurveysUseCase(cRepo, vRepo);
-    const controller = new campaign_controller_1.CampaignController(launchCampaignUseCase, getCampaignMetricsUseCase, listCampaignsUseCase, dispatchRemindersUseCase, validateAndBurnTokenUseCase, handleDeliveryWebhookUseCase, getOptimalDispatchTimeUseCase, generateKioskPinsUseCase, getCampaignKioskRosterUseCase, getMySurveysUseCase);
+    const completeCampaignUseCase = new complete_campaign_use_case_1.CompleteCampaignUseCase(cRepo);
+    const deleteCampaignUseCase = new delete_campaign_use_case_1.DeleteCampaignUseCase(cRepo);
+    const controller = new campaign_controller_1.CampaignController(launchCampaignUseCase, getCampaignMetricsUseCase, listCampaignsUseCase, dispatchRemindersUseCase, validateAndBurnTokenUseCase, handleDeliveryWebhookUseCase, getOptimalDispatchTimeUseCase, generateKioskPinsUseCase, getCampaignKioskRosterUseCase, getMySurveysUseCase, completeCampaignUseCase, deleteCampaignUseCase);
     // Webhooks (Unauthenticated or provider signature validated)
     router.post('/webhooks/aws-ses', controller.handleWebhook);
     router.post('/webhooks/twilio', controller.handleWebhook);
@@ -54,6 +60,8 @@ function createCampaignRouter(campaignRepo, vaultRepo, redisRepo, surveyRepo, em
     router.get('/campaigns/:campaignId', (0, auth_middleware_1.authorize)([auth_middleware_1.UserRole.SUPER_ADMIN, auth_middleware_1.UserRole.PROJECT_ADMIN, auth_middleware_1.UserRole.CONSULTANT_DAASH, auth_middleware_1.UserRole.ORG_ADMIN, auth_middleware_1.UserRole.HR_MANAGER, auth_middleware_1.UserRole.REPORT_VIEWER]), controller.getCampaignMetrics);
     router.get('/campaigns/:campaignId/metrics', (0, auth_middleware_1.authorize)([auth_middleware_1.UserRole.SUPER_ADMIN, auth_middleware_1.UserRole.PROJECT_ADMIN, auth_middleware_1.UserRole.CONSULTANT_DAASH, auth_middleware_1.UserRole.ORG_ADMIN, auth_middleware_1.UserRole.HR_MANAGER, auth_middleware_1.UserRole.REPORT_VIEWER]), controller.getCampaignMetrics);
     router.post('/campaigns/:campaignId/remind', (0, auth_middleware_1.authorize)([auth_middleware_1.UserRole.SUPER_ADMIN, auth_middleware_1.UserRole.PROJECT_ADMIN, auth_middleware_1.UserRole.CONSULTANT_DAASH, auth_middleware_1.UserRole.ORG_ADMIN, auth_middleware_1.UserRole.HR_MANAGER]), controller.dispatchReminders);
+    router.post('/campaigns/:campaignId/complete', (0, auth_middleware_1.authorize)([auth_middleware_1.UserRole.SUPER_ADMIN, auth_middleware_1.UserRole.PROJECT_ADMIN, auth_middleware_1.UserRole.CONSULTANT_DAASH, auth_middleware_1.UserRole.HR_MANAGER]), controller.completeCampaign);
+    router.delete('/campaigns/:campaignId', (0, auth_middleware_1.authorize)([auth_middleware_1.UserRole.SUPER_ADMIN, auth_middleware_1.UserRole.PROJECT_ADMIN, auth_middleware_1.UserRole.CONSULTANT_DAASH]), controller.deleteCampaign);
     return router;
 }
 //# sourceMappingURL=campaign.routes.js.map

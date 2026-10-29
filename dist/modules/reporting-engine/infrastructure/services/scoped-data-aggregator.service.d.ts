@@ -5,6 +5,7 @@ export interface ScopedMetricSummary {
     scopeType: ReportScopeType;
     scopeFilter?: IReportScopeFilter;
     sampleSize: number;
+    totalResponses?: number;
     eligibleCount: number;
     participationRate: number;
     enpsScore: number;
@@ -47,7 +48,10 @@ export interface ScopedMetricSummary {
     suppressionNotice?: string;
 }
 export declare class ScopedDataAggregatorService {
+    private responseModel;
+    private campaignModel;
+    private orgNodeModel;
     static readonly PRIVACY_THRESHOLD = 5;
-    aggregate(projectId: string, campaignId: string, scopeType: ReportScopeType, scopeFilter?: IReportScopeFilter): Promise<ScopedMetricSummary>;
-    private getSimulatedSampleSize;
+    constructor(responseModel?: any, campaignModel?: any, orgNodeModel?: any);
+    aggregate(projectId: string, campaignId: string, scopeType: ReportScopeType, scopeFilter?: IReportScopeFilter, bypassPrivacy?: boolean): Promise<ScopedMetricSummary>;
 }

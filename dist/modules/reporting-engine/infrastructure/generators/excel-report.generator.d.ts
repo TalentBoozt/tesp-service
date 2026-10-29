@@ -1,5 +1,6 @@
 import { ScopedMetricSummary } from '../services/scoped-data-aggregator.service';
 import { ReportScopeType, IReportScopeFilter } from '../../domain/entities/scoped-report.entity';
+import { ReportBrandingOptions } from './pdf-report.generator';
 export interface GenerateExcelOptions {
     reportId: string;
     projectId: string;
@@ -10,6 +11,9 @@ export interface GenerateExcelOptions {
     includeAiSentimentSummary?: boolean;
     includeBenchmarkComparison?: boolean;
     requestedBy?: string;
+    branding?: ReportBrandingOptions;
+    benchmark?: number | null;
+    bypassPrivacy?: boolean;
 }
 export interface GeneratedExcelResult {
     filePath: string;
@@ -21,6 +25,4 @@ export interface GeneratedExcelResult {
 export declare class ExcelReportGenerator {
     private aggregator;
     generateExcel(options: GenerateExcelOptions): Promise<GeneratedExcelResult>;
-    private escapeXml;
-    private buildMultiTabWorkbook;
 }

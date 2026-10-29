@@ -12,4 +12,18 @@ export declare const config: {
         pass: string;
         from: string;
     };
+    r2: {
+        accountId: string;
+        accessKeyId: string;
+        secretAccessKey: string;
+        bucket: string;
+        publicUrl: string;
+        endpoint: string;
+        region: string;
+    };
+    security: {
+        fieldEncryptionKey: string;
+        blindIndexKey: string;
+    };
 };
+export * from './environment';

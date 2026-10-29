@@ -17,6 +17,14 @@ const auth_middleware_1 = require("../../presentation/middleware/auth.middleware
 const auth_seeder_service_1 = require("../../../modules/auth/infrastructure/services/auth-seeder.service");
 const consulting_firm_seeder_service_1 = require("../../../modules/consultant/infrastructure/services/consulting-firm-seeder.service");
 async function seedDatabase() {
+    if (process.env.NODE_ENV === 'production' && process.env.ALLOW_DESTRUCTIVE_SEED !== 'true') {
+        const errorMsg = 'FATAL: Database seed script cannot be executed in production environment without explicit ALLOW_DESTRUCTIVE_SEED=true!';
+        console.error(errorMsg);
+        if (!process.env.VITEST) {
+            process.exit(1);
+        }
+        throw new Error(errorMsg);
+    }
     console.log('--- [TESP Database Seeder] Connecting to MongoDB Atlas... ---');
     await database_1.Database.connect();
     console.log('[TESP Seeder] Purging legacy test accounts and ensuring sole Super Admin...');

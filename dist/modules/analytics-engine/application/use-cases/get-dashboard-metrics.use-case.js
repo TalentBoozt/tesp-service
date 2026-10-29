@@ -1,15 +1,49 @@
 "use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.GetDashboardMetricsUseCase = void 0;
+exports.GetDashboardMetricsUseCase = exports.DIMENSION_LABEL_MAP = void 0;
 const enps_calculator_service_1 = require("../../domain/services/enps-calculator.service");
 const engagement_index_calculator_1 = require("../../domain/services/engagement-index.calculator");
 const privacy_guard_service_1 = require("../../domain/services/privacy-guard.service");
 const mongoose_1 = __importDefault(require("mongoose"));
 const campaign_schema_1 = require("../../../survey-distribution/infrastructure/persistence/mongoose/campaign.schema");
-const DIMENSION_LABEL_MAP = {
+const project_repository_1 = require("../../../project-config/infrastructure/persistence/mongoose/project.repository");
+exports.DIMENSION_LABEL_MAP = {
     leadership_trust: 'Leadership & Vision Trust',
     enps: 'Employee Net Promoter Score (eNPS)',
     workplace_culture: 'Workplace Inclusion & Safety',
@@ -21,18 +55,28 @@ const DIMENSION_LABEL_MAP = {
 class GetDashboardMetricsUseCase {
     responseRepo;
     redisAnalyticsRepo;
+    projectRepo;
     enpsCalculator;
     engagementCalculator;
     privacyGuard;
-    constructor(responseRepo, redisAnalyticsRepo) {
+    constructor(responseRepo, redisAnalyticsRepo, projectRepo) {
         this.responseRepo = responseRepo;
         this.redisAnalyticsRepo = redisAnalyticsRepo;
+        this.projectRepo = projectRepo;
         this.enpsCalculator = new enps_calculator_service_1.EnpsCalculatorService();
         this.engagementCalculator = new engagement_index_calculator_1.EngagementIndexCalculatorService();
         this.privacyGuard = new privacy_guard_service_1.PrivacyGuardService();
+        if (!this.projectRepo && mongoose_1.default.connection?.readyState === 1) {
+            try {
+                this.projectRepo = new project_repository_1.ProjectMongoRepository();
+            }
+            catch {
+                // Fallback for isolated unit tests without mongoose connection
+            }
+        }
     }
-    async execute(projectId, campaignId, nodeId = 'GLOBAL', demographicFilters) {
-        const filters = { nodeId, ...(demographicFilters || {}) };
+    async execute(projectId, campaignId, nodeId = 'GLOBAL', demographicFilters, bypassPrivacy = false) {
+        const filters = { nodeId, ...(demographicFilters || {}), bypassPrivacy: Boolean(bypassPrivacy) };
         const filterHash = this.redisAnalyticsRepo
             ? this.redisAnalyticsRepo.generateFilterHash(filters)
             : 'default';
@@ -42,21 +86,208 @@ class GetDashboardMetricsUseCase {
             if (cached)
                 return cached;
         }
-        // 2. Query Target Info from Campaign
-        let totalTarget = 500;
+        // 2. Query Target Info & Survey AST from Campaign
+        let totalTarget = 0;
+        const questionDimensionMap = new Map();
         if (mongoose_1.default.connection.readyState === 1) {
             try {
                 const campaign = await campaign_schema_1.CampaignModel.findOne({ projectId, campaignId }).lean();
                 if (campaign) {
-                    totalTarget = campaign.metrics?.totalTargeted || campaign.targetCount || 500;
+                    totalTarget = campaign.metrics?.totalTargeted || campaign.targetCount || 0;
+                    const isNonAnonymous = campaign.anonymityLevel === 'AUTHENTICATED';
+                    if (isNonAnonymous) {
+                        bypassPrivacy = true;
+                    }
+                    const surveyId = campaign.surveyId;
+                    if (surveyId) {
+                        const { SurveyModel } = await Promise.resolve().then(() => __importStar(require('../../../survey/infrastructure/persistence/mongoose/survey.schema')));
+                        const survey = await SurveyModel.findOne({ projectId, surveyId }).lean();
+                        if (survey && survey.pages) {
+                            for (const page of survey.pages) {
+                                for (const sec of (page.sections || [])) {
+                                    for (const q of (sec.questions || [])) {
+                                        const dimKey = (q.groupId || 'general').toLowerCase();
+                                        const dimName = exports.DIMENSION_LABEL_MAP[dimKey] ||
+                                            dimKey.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+                                        questionDimensionMap.set(q.questionId, { dimensionKey: dimKey, dimensionName: dimName });
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
             }
             catch {
-                // Use fallback target count
+                // Continue with available context
             }
         }
-        // 3. Query Responses for Campaign
-        const { responses } = await this.responseRepo.findAllByCampaign(projectId, campaignId, { limit: 10000 });
+        // 2.5 Query Project Benchmark Settings (GAP-007 / TASK-009)
+        let configuredOverallBenchmark = null;
+        let configuredDimensionBenchmarks;
+        if (this.projectRepo) {
+            try {
+                const project = await this.projectRepo.findByProjectId(projectId);
+                if (project && project.benchmarkSettings) {
+                    if (typeof project.benchmarkSettings.overallScoreBenchmark === 'number') {
+                        configuredOverallBenchmark = project.benchmarkSettings.overallScoreBenchmark;
+                    }
+                    if (project.benchmarkSettings.dimensionBenchmarks) {
+                        configuredDimensionBenchmarks = project.benchmarkSettings.dimensionBenchmarks;
+                    }
+                }
+            }
+            catch {
+                // Fallback gracefully if benchmark query fails
+            }
+        }
+        const resolveDimensionBenchmark = (dimKey) => {
+            if (configuredDimensionBenchmarks) {
+                if (typeof configuredDimensionBenchmarks[dimKey] === 'number') {
+                    return configuredDimensionBenchmarks[dimKey];
+                }
+                const lower = dimKey.toLowerCase();
+                if (typeof configuredDimensionBenchmarks[lower] === 'number') {
+                    return configuredDimensionBenchmarks[lower];
+                }
+            }
+            return configuredOverallBenchmark;
+        };
+        // 3. Query Responses via Native Aggregation when supported (GAP-016)
+        if (typeof this.responseRepo.aggregateDashboardStats === 'function') {
+            const aggResult = await this.responseRepo.aggregateDashboardStats(projectId, campaignId, {
+                nodeId,
+                demographicFilters,
+            });
+            const responseCount = aggResult.totalResponses;
+            if (responseCount === 0) {
+                const emptyResult = {
+                    status: 'SUPPRESSED',
+                    responseCount: 0,
+                    eNPS: null,
+                    engagementIndex: null,
+                    reason: 'No survey responses recorded for this campaign',
+                    campaignId,
+                    nodeId,
+                    totalTarget,
+                    totalResponses: 0,
+                    responseRate: 0,
+                    overallScore: null,
+                    enpsScore: null,
+                    benchmark: configuredOverallBenchmark,
+                    variance: null,
+                    promotersPercent: 0,
+                    passivesPercent: 0,
+                    detractorsPercent: 0,
+                    dimensions: [],
+                    groupScores: [],
+                    participationRate: 0,
+                    hasData: false,
+                    isBaseline: true,
+                };
+                if (this.redisAnalyticsRepo) {
+                    await this.redisAnalyticsRepo.cacheAnalytics(projectId, campaignId, filterHash, emptyResult, 60);
+                }
+                return emptyResult;
+            }
+            const { promoters, passives, detractors, totalNps } = aggResult.npsStats;
+            let eNPS = null;
+            let promotersPercent = 0;
+            let passivesPercent = 0;
+            let detractorsPercent = 0;
+            if (totalNps > 0) {
+                promotersPercent = Math.round((promoters / totalNps) * 100);
+                passivesPercent = Math.round((passives / totalNps) * 100);
+                detractorsPercent = Math.round((detractors / totalNps) * 100);
+                eNPS = promotersPercent - detractorsPercent;
+            }
+            const minCohort = this.privacyGuard.getMinCohortSize();
+            const effectiveThreshold = (totalTarget > 0 && totalTarget < minCohort) ? Math.min(minCohort, totalTarget) : minCohort;
+            const isSuppressed = !bypassPrivacy && (responseCount < effectiveThreshold);
+            const dimensions = aggResult.dimensionStats.map((d) => {
+                const dimKey = d.groupId.toLowerCase();
+                const dimName = exports.DIMENSION_LABEL_MAP[dimKey] || dimKey.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+                const score = Math.round(d.avgScore * 20 * 10) / 10;
+                const bm = resolveDimensionBenchmark(dimKey);
+                const variance = (bm !== null && typeof bm === 'number') ? Number((score - bm).toFixed(1)) : null;
+                return {
+                    dimensionKey: dimKey,
+                    dimensionName: dimName,
+                    score: (isSuppressed && !bypassPrivacy) ? 0 : score,
+                    benchmark: bm,
+                    variance: (isSuppressed && !bypassPrivacy) ? null : variance,
+                    favorablePercent: (isSuppressed && !bypassPrivacy) ? 0 : Math.min(100, Math.round(score)),
+                    neutralPercent: (isSuppressed && !bypassPrivacy) ? 0 : 15,
+                    unfavorablePercent: (isSuppressed && !bypassPrivacy) ? 0 : Math.max(0, 100 - Math.min(100, Math.round(score)) - 15),
+                    responseCount: d.count,
+                    isSuppressed,
+                };
+            });
+            const overallScore = dimensions.length > 0
+                ? Math.round(aggResult.dimensionStats.reduce((acc, curr) => acc + curr.avgScore * 20, 0) / aggResult.dimensionStats.length * 10) / 10
+                : null;
+            const responseRate = totalTarget > 0 ? Number(((responseCount / totalTarget) * 100).toFixed(1)) : 0;
+            if (isSuppressed) {
+                const suppressedResult = {
+                    status: 'SUPPRESSED',
+                    responseCount,
+                    eNPS: null,
+                    engagementIndex: null,
+                    reason: `Differential privacy guard triggered: cohort sample size (N=${responseCount}) is strictly below k-anonymity threshold (k=${effectiveThreshold}). Metrics are suppressed to guarantee employee confidentiality.`,
+                    campaignId,
+                    nodeId,
+                    totalTarget,
+                    totalResponses: responseCount,
+                    responseRate,
+                    overallScore: null,
+                    enpsScore: null,
+                    benchmark: configuredOverallBenchmark,
+                    variance: null,
+                    promotersPercent: 0,
+                    passivesPercent: 0,
+                    detractorsPercent: 0,
+                    dimensions,
+                    groupScores: [],
+                    participationRate: responseRate,
+                    hasData: true,
+                    isBaseline: false,
+                };
+                if (this.redisAnalyticsRepo) {
+                    await this.redisAnalyticsRepo.cacheAnalytics(projectId, campaignId, filterHash, suppressedResult, 60);
+                }
+                return suppressedResult;
+            }
+            const result = {
+                status: 'VALID',
+                responseCount,
+                eNPS,
+                engagementIndex: overallScore,
+                dimensions,
+                groupScores: dimensions.map((d) => ({ groupId: d.dimensionKey, score: d.score })),
+                campaignId,
+                nodeId,
+                totalTarget,
+                totalResponses: responseCount,
+                responseRate,
+                overallScore,
+                enpsScore: eNPS,
+                benchmark: configuredOverallBenchmark,
+                variance: (overallScore !== null && configuredOverallBenchmark !== null)
+                    ? Number((overallScore - configuredOverallBenchmark).toFixed(1))
+                    : null,
+                promotersPercent,
+                passivesPercent,
+                detractorsPercent,
+                participationRate: responseRate,
+                hasData: true,
+                isBaseline: false,
+            };
+            if (this.redisAnalyticsRepo) {
+                await this.redisAnalyticsRepo.cacheAnalytics(projectId, campaignId, filterHash, result, 60);
+            }
+            return result;
+        }
+        // Fallback: In-memory evaluation when repository does not implement native aggregation
+        const { responses } = await this.responseRepo.findAllByCampaign(projectId, campaignId);
         // Filter by nodeId and demographics if specified
         const filteredResponses = responses.filter((r) => {
             if (r.isDeleted)
@@ -65,14 +296,60 @@ class GetDashboardMetricsUseCase {
                 return false;
             if (demographicFilters) {
                 for (const [key, val] of Object.entries(demographicFilters)) {
-                    if (val && val !== 'ALL' && r.demographicSnapshot?.[key] !== val)
-                        return false;
+                    if (val && val !== 'ALL') {
+                        const keyLower = key.toLowerCase();
+                        const demo = r.demographicSnapshot || {};
+                        let actualVal = demo[key] ??
+                            demo[keyLower] ??
+                            demo[key.charAt(0).toUpperCase() + key.slice(1)];
+                        if (!actualVal && Array.isArray(r.answers)) {
+                            const matchedAns = r.answers.find((a) => (a.textValue && a.textValue.toLowerCase() === val.toLowerCase()) ||
+                                (Array.isArray(a.selectedOptions) && a.selectedOptions.some((opt) => opt.toLowerCase() === val.toLowerCase())) ||
+                                (Array.isArray(a.choiceValues) && a.choiceValues.some((opt) => opt.toLowerCase() === val.toLowerCase())));
+                            if (matchedAns)
+                                actualVal = val;
+                        }
+                        if (!actualVal || actualVal.toString().trim().toLowerCase() !== val.toString().trim().toLowerCase()) {
+                            return false;
+                        }
+                    }
                 }
             }
             return true;
         });
         const responseCount = filteredResponses.length;
-        // 4. Extract NPS and Likert scores & group into dimensions
+        // Zero-response authentic empty state: zero fabricated metrics
+        if (responseCount === 0) {
+            const emptyResult = {
+                status: 'SUPPRESSED',
+                responseCount: 0,
+                eNPS: null,
+                engagementIndex: null,
+                reason: 'No survey responses recorded for this campaign',
+                campaignId,
+                nodeId,
+                totalTarget,
+                totalResponses: 0,
+                responseRate: 0,
+                overallScore: null,
+                enpsScore: null,
+                benchmark: configuredOverallBenchmark,
+                variance: null,
+                promotersPercent: 0,
+                passivesPercent: 0,
+                detractorsPercent: 0,
+                dimensions: [],
+                groupScores: [],
+                participationRate: 0,
+                hasData: false,
+                isBaseline: true,
+            };
+            if (this.redisAnalyticsRepo) {
+                await this.redisAnalyticsRepo.cacheAnalytics(projectId, campaignId, filterHash, emptyResult, 60);
+            }
+            return emptyResult;
+        }
+        // 4. Extract NPS and Likert scores & group dynamically into dimensions
         const npsScores = [];
         const likertScores = [];
         const groupAnswers = [];
@@ -89,15 +366,17 @@ class GetDashboardMetricsUseCase {
                 if ((qType === 'LIKERT' || qType.startsWith('LIKERT') || qType === 'RATING') &&
                     ans.numericValue !== undefined) {
                     likertScores.push(ans.numericValue);
-                    const rawDim = ans.questionId.split('-')[0]?.toLowerCase() || 'general';
-                    groupAnswers.push({ groupId: rawDim.toUpperCase(), numericValue: ans.numericValue });
-                    const dimKey = rawDim.includes('lead')
-                        ? 'leadership_trust'
-                        : rawDim.includes('cult') || rawDim.includes('safe')
-                            ? 'workplace_culture'
-                            : rawDim.includes('grow') || rawDim.includes('dev')
-                                ? 'growth_learning'
-                                : rawDim;
+                    let dimKey = 'general';
+                    if (questionDimensionMap.has(ans.questionId)) {
+                        dimKey = questionDimensionMap.get(ans.questionId).dimensionKey;
+                    }
+                    else {
+                        // Deduce from question identifier format (e.g. GRP-LEADERSHIP-101)
+                        const parts = ans.questionId.split('-');
+                        const raw = parts.length > 2 ? parts[1] : parts[0];
+                        dimKey = raw.toLowerCase();
+                    }
+                    groupAnswers.push({ groupId: dimKey.toUpperCase(), numericValue: ans.numericValue });
                     if (!dimensionBuckets.has(dimKey))
                         dimensionBuckets.set(dimKey, []);
                     dimensionBuckets.get(dimKey).push(ans.numericValue);
@@ -106,36 +385,89 @@ class GetDashboardMetricsUseCase {
         }
         // 5. Calculate Raw Metrics
         const enpsResult = this.enpsCalculator.calculateEnps(npsScores);
-        const engagementIndex = this.engagementCalculator.calculateIndex(likertScores);
+        const engagementIndex = likertScores.length > 0
+            ? this.engagementCalculator.calculateIndex(likertScores)
+            : null;
         const groupScores = this.engagementCalculator.calculateGroupScores(groupAnswers);
-        // 6. Build Dimensions Array
-        const dimensions = [];
-        const standardDims = ['leadership_trust', 'enps', 'workplace_culture', 'growth_learning'];
-        for (const key of standardDims) {
-            const bucket = dimensionBuckets.get(key) || [];
-            const count = bucket.length;
-            let score = 78.0;
-            if (key === 'enps') {
-                score = enpsResult.eNPS !== null ? enpsResult.eNPS : 42.0;
+        // 6. Query historical baseline snapshot for authentic previousScore comparison
+        const baselineDimensionScores = new Map();
+        if (mongoose_1.default.connection.readyState === 1) {
+            try {
+                const { AnalyticalSnapshotModel } = await Promise.resolve().then(() => __importStar(require('../../infrastructure/persistence/mongoose/analytical-snapshot.schema')));
+                const baseline = await AnalyticalSnapshotModel.findOne({
+                    projectId,
+                    campaignId: { $ne: campaignId },
+                })
+                    .sort({ snapshotDate: -1 })
+                    .lean();
+                if (baseline && Array.isArray(baseline.groupScores)) {
+                    for (const gs of baseline.groupScores) {
+                        baselineDimensionScores.set(gs.groupId.toLowerCase(), gs.score);
+                    }
+                }
             }
-            else if (count > 0) {
+            catch {
+                // No baseline snapshot available
+            }
+        }
+        // 7. Build Dimensions Array based on actual question data
+        const dimensions = [];
+        for (const [key, bucket] of dimensionBuckets.entries()) {
+            if (bucket.length === 0)
+                continue;
+            let score;
+            if (key === 'enps') {
+                if (enpsResult.eNPS === null)
+                    continue;
+                score = enpsResult.eNPS;
+            }
+            else {
                 score = this.engagementCalculator.calculateIndex(bucket);
             }
+            const baselineScore = baselineDimensionScores.get(key.toLowerCase());
+            const bm = resolveDimensionBenchmark(key);
+            const dimensionVariance = (bm !== null && typeof bm === 'number') ? Number((score - bm).toFixed(1)) : null;
             dimensions.push({
                 dimensionKey: key,
-                dimensionName: DIMENSION_LABEL_MAP[key] || key.replace('_', ' ').toUpperCase(),
+                dimensionName: exports.DIMENSION_LABEL_MAP[key] || key.replace(/_/g, ' ').toUpperCase(),
                 score: Number(score.toFixed(1)),
-                previousScore: Number((score * 0.95).toFixed(1)),
-                responseCount: Math.max(count, responseCount),
+                previousScore: baselineScore !== undefined ? Number(baselineScore.toFixed(1)) : undefined,
+                benchmark: bm,
+                variance: dimensionVariance,
+                responseCount: bucket.length,
             });
         }
-        // 7. Apply Privacy Guard (N < 5)
-        const privacyResult = this.privacyGuard.applyPrivacyGuard(responseCount, enpsResult.eNPS, engagementIndex);
-        const safeOverallScore = engagementIndex !== null && engagementIndex > 0
+        // 8. Apply Privacy Guard (N < 5)
+        const minCohort = this.privacyGuard.getMinCohortSize();
+        const effectiveThreshold = (totalTarget > 0 && totalTarget < minCohort) ? Math.min(minCohort, totalTarget) : minCohort;
+        const isSuppressed = !bypassPrivacy && (responseCount < effectiveThreshold);
+        const privacyResult = isSuppressed
+            ? {
+                status: 'SUPPRESSED',
+                responseCount,
+                eNPS: null,
+                engagementIndex: null,
+                reason: `Differential privacy guard triggered: cohort sample size (N=${responseCount}) is strictly below k-anonymity threshold (k=${effectiveThreshold}). Metrics are suppressed to guarantee employee confidentiality.`,
+            }
+            : {
+                status: 'VALID',
+                responseCount,
+                eNPS: enpsResult.eNPS,
+                engagementIndex,
+            };
+        const calculatedOverallScore = engagementIndex !== null
             ? Number(engagementIndex.toFixed(1))
-            : enpsResult.eNPS !== null
-                ? Math.max(0, Math.min(100, Math.round(50 + enpsResult.eNPS / 2)))
-                : 78.4;
+            : dimensions.length > 0
+                ? Math.round(dimensions.reduce((acc, curr) => acc + curr.score, 0) / dimensions.length * 10) / 10
+                : enpsResult.eNPS !== null
+                    ? Math.max(0, Math.min(100, Math.round(50 + enpsResult.eNPS / 2)))
+                    : null;
+        const safeOverallScore = (isSuppressed && !bypassPrivacy) ? null : calculatedOverallScore;
+        const maskedDimensions = dimensions.map((d) => ({
+            ...d,
+            isSuppressed,
+            score: (isSuppressed && !bypassPrivacy) ? 0 : d.score,
+        }));
         const responseRate = totalTarget > 0
             ? Number(((responseCount / totalTarget) * 100).toFixed(1))
             : 0;
@@ -147,15 +479,21 @@ class GetDashboardMetricsUseCase {
             totalResponses: responseCount,
             responseRate,
             overallScore: safeOverallScore,
-            enpsScore: enpsResult.eNPS !== null ? enpsResult.eNPS : 42.0,
-            promotersPercent: enpsResult.promoterPercent || 58,
-            passivesPercent: enpsResult.passivePercent || 26,
-            detractorsPercent: enpsResult.detractorPercent || 16,
-            dimensions,
-            groupScores: privacyResult.status === 'SUPPRESSED' ? [] : groupScores,
+            enpsScore: (isSuppressed && !bypassPrivacy) ? null : enpsResult.eNPS,
+            benchmark: configuredOverallBenchmark,
+            variance: (safeOverallScore !== null && configuredOverallBenchmark !== null)
+                ? Number((safeOverallScore - configuredOverallBenchmark).toFixed(1))
+                : null,
+            promotersPercent: (isSuppressed && !bypassPrivacy) ? 0 : enpsResult.promoterPercent,
+            passivesPercent: (isSuppressed && !bypassPrivacy) ? 0 : enpsResult.passivePercent,
+            detractorsPercent: (isSuppressed && !bypassPrivacy) ? 0 : enpsResult.detractorPercent,
+            dimensions: maskedDimensions,
+            groupScores: (isSuppressed && !bypassPrivacy) ? [] : groupScores,
             participationRate: responseRate,
+            hasData: true,
+            isBaseline: false,
         };
-        // 8. Cache in Redis
+        // 9. Cache in Redis
         if (this.redisAnalyticsRepo) {
             await this.redisAnalyticsRepo.cacheAnalytics(projectId, campaignId, filterHash, result, 3600);
         }

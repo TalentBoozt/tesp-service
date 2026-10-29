@@ -1,5 +1,5 @@
 export interface EnpsCalculationResult {
-    eNPS: number;
+    eNPS: number | null;
     totalResponses: number;
     promoters: number;
     passives: number;

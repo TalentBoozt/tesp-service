@@ -32,7 +32,11 @@ class SystemEmailService {
             secure: isSecure,
             auth: config.user && config.pass ? { user: config.user, pass: config.pass } : undefined,
             tls: {
-                rejectUnauthorized: false,
+                rejectUnauthorized: process.env.NODE_ENV === 'production'
+                    ? true
+                    : process.env.SMTP_ALLOW_INSECURE_TLS === 'true'
+                        ? false
+                        : true,
             },
         });
     }
@@ -41,10 +45,39 @@ class SystemEmailService {
      */
     async verifyConnection() {
         const config = this.getSmtpConfig();
-        if (!config.pass || config.pass.startsWith('••••') || config.pass === 'PASSWORD') {
+        const isMock = !config.pass ||
+            config.pass.startsWith('••••') ||
+            config.pass === 'PASSWORD';
+        // In production or staging, never simulate handshake: credentials must be real and socket must connect
+        if (process.env.NODE_ENV === 'production' || process.env.NODE_ENV === 'staging') {
+            if (isMock) {
+                return {
+                    success: false,
+                    message: `SMTP connection failed: Missing or placeholder SMTP credentials in ${process.env.NODE_ENV} environment`,
+                };
+            }
+            try {
+                const transporter = this.createTransporter();
+                await transporter.verify();
+                return {
+                    success: true,
+                    message: `SMTP connection to ${config.host}:${config.port} verified successfully`,
+                };
+            }
+            catch (err) {
+                // Redact any cleartext passwords from error messages
+                const safeError = (err.message || 'Unknown network error').replace(new RegExp(config.pass, 'gi'), '[REDACTED]');
+                return {
+                    success: false,
+                    message: `SMTP connection failed: ${safeError}`,
+                };
+            }
+        }
+        // In development or test environments, allow simulated verification for offline workflows
+        if (isMock || process.env.NODE_ENV === 'test') {
             return {
                 success: true,
-                message: `Simulated SMTP handshake for ${config.host}:${config.port} (No live SMTP_PASS configured)`,
+                message: `Simulated SMTP handshake for ${config.host}:${config.port} (No live SMTP_PASS configured in ${process.env.NODE_ENV || 'development'})`,
             };
         }
         try {
@@ -56,9 +89,10 @@ class SystemEmailService {
             };
         }
         catch (err) {
+            const safeError = (err.message || 'Unknown network error').replace(new RegExp(config.pass, 'gi'), '[REDACTED]');
             return {
                 success: false,
-                message: `SMTP connection failed: ${err.message}`,
+                message: `SMTP connection failed: ${safeError}`,
             };
         }
     }
@@ -72,6 +106,9 @@ class SystemEmailService {
             config.pass === 'PASSWORD' ||
             process.env.NODE_ENV === 'test';
         if (isMock) {
+            if (process.env.NODE_ENV === 'production') {
+                throw new Error('System email service unavailable: SMTP credentials are not configured in production environment');
+            }
             return {
                 success: true,
                 messageId: `system_sim_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`,

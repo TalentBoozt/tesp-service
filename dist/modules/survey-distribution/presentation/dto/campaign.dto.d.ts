@@ -76,6 +76,8 @@ export declare const WebhookPayloadDtoSchema: z.ZodObject<{
     eventType: z.ZodEnum<["DELIVERED", "OPENED", "BOUNCED", "FAILED"]>;
     projectId: z.ZodString;
     campaignId: z.ZodString;
+    eventId: z.ZodOptional<z.ZodString>;
+    messageId: z.ZodOptional<z.ZodString>;
     recipientEmail: z.ZodOptional<z.ZodString>;
     recipientPhone: z.ZodOptional<z.ZodString>;
     timestamp: z.ZodOptional<z.ZodString>;
@@ -84,7 +86,9 @@ export declare const WebhookPayloadDtoSchema: z.ZodObject<{
     projectId: string;
     campaignId: string;
     eventType: "FAILED" | "DELIVERED" | "OPENED" | "BOUNCED";
+    eventId?: string | undefined;
     timestamp?: string | undefined;
+    messageId?: string | undefined;
     recipientEmail?: string | undefined;
     recipientPhone?: string | undefined;
 }, {
@@ -92,7 +96,9 @@ export declare const WebhookPayloadDtoSchema: z.ZodObject<{
     projectId: string;
     campaignId: string;
     eventType: "FAILED" | "DELIVERED" | "OPENED" | "BOUNCED";
+    eventId?: string | undefined;
     timestamp?: string | undefined;
+    messageId?: string | undefined;
     recipientEmail?: string | undefined;
     recipientPhone?: string | undefined;
 }>;

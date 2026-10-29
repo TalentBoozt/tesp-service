@@ -6,6 +6,9 @@ import { GetSurveyUseCase } from '../../application/use-cases/get-survey.use-cas
 import { ListSurveysUseCase } from '../../application/use-cases/list-surveys.use-case';
 import { DeleteSurveyUseCase } from '../../application/use-cases/delete-survey.use-case';
 import { QuestionLibraryUseCase } from '../../application/use-cases/question-library.use-case';
+import { ListSurveyTemplatesUseCase } from '../../application/use-cases/list-survey-templates.use-case';
+import { GetSurveyTemplateUseCase } from '../../application/use-cases/get-survey-template.use-case';
+import { InstantiateSurveyTemplateUseCase } from '../../application/use-cases/instantiate-survey-template.use-case';
 export declare class SurveyController {
     private createSurveyDraftUseCase;
     private publishSurveyUseCase;
@@ -14,7 +17,10 @@ export declare class SurveyController {
     private listSurveysUseCase;
     private deleteSurveyUseCase;
     private questionLibraryUseCase;
-    constructor(createSurveyDraftUseCase: CreateSurveyDraftUseCase, publishSurveyUseCase: PublishSurveyUseCase, cloneSurveyVersionUseCase: CloneSurveyVersionUseCase, getSurveyUseCase: GetSurveyUseCase, listSurveysUseCase: ListSurveysUseCase, deleteSurveyUseCase: DeleteSurveyUseCase, questionLibraryUseCase: QuestionLibraryUseCase);
+    private listSurveyTemplatesUseCase;
+    private getSurveyTemplateUseCase;
+    private instantiateSurveyTemplateUseCase;
+    constructor(createSurveyDraftUseCase: CreateSurveyDraftUseCase, publishSurveyUseCase: PublishSurveyUseCase, cloneSurveyVersionUseCase: CloneSurveyVersionUseCase, getSurveyUseCase: GetSurveyUseCase, listSurveysUseCase: ListSurveysUseCase, deleteSurveyUseCase: DeleteSurveyUseCase, questionLibraryUseCase: QuestionLibraryUseCase, listSurveyTemplatesUseCase?: ListSurveyTemplatesUseCase, getSurveyTemplateUseCase?: GetSurveyTemplateUseCase, instantiateSurveyTemplateUseCase?: InstantiateSurveyTemplateUseCase);
     createDraft: (req: Request, res: Response, next: NextFunction) => Promise<void>;
     saveDraft: (req: Request, res: Response, next: NextFunction) => Promise<void>;
     publishSurvey: (req: Request, res: Response, next: NextFunction) => Promise<void>;
@@ -24,4 +30,7 @@ export declare class SurveyController {
     deleteSurvey: (req: Request, res: Response, next: NextFunction) => Promise<void>;
     saveLibraryItem: (req: Request, res: Response, next: NextFunction) => Promise<void>;
     getLibraryItems: (req: Request, res: Response, next: NextFunction) => Promise<void>;
+    listTemplates: (req: Request, res: Response, next: NextFunction) => Promise<void>;
+    getTemplate: (req: Request, res: Response, next: NextFunction) => Promise<void>;
+    instantiateFromTemplate: (req: Request, res: Response, next: NextFunction) => Promise<void>;
 }

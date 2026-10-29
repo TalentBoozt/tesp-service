@@ -17,6 +17,7 @@ export declare class OrgNodeController {
     private deleteOrgNodeUseCase;
     private listOrgNodesUseCase;
     constructor(createOrgNodeUseCase: CreateOrgNodeUseCase, moveOrgNodeUseCase: MoveOrgNodeUseCase, getOrgNodeUseCase: GetOrgNodeUseCase, getSubTreeUseCase: GetSubTreeUseCase, getAncestorsUseCase: GetAncestorsUseCase, updateOrgNodeUseCase: UpdateOrgNodeUseCase, deleteOrgNodeUseCase: DeleteOrgNodeUseCase, listOrgNodesUseCase: ListOrgNodesUseCase);
+    private enforceTenantAccess;
     createNode: (req: Request, res: Response, next: NextFunction) => Promise<void>;
     moveNode: (req: Request, res: Response, next: NextFunction) => Promise<void>;
     getNode: (req: Request, res: Response, next: NextFunction) => Promise<void>;

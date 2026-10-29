@@ -20,6 +20,12 @@ class PrivacyGuardService {
             engagementIndex: computedEngagementIndex,
         };
     }
+    canExposeCohort(responseCount) {
+        return responseCount >= PrivacyGuardService.MIN_THRESHOLD;
+    }
+    getMinCohortSize() {
+        return PrivacyGuardService.MIN_THRESHOLD;
+    }
 }
 exports.PrivacyGuardService = PrivacyGuardService;
 //# sourceMappingURL=privacy-guard.service.js.map

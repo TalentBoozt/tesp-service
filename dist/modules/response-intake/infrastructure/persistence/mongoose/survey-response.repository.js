@@ -57,6 +57,153 @@ class SurveyResponseMongoRepository {
             total,
         };
     }
+    async aggregateDashboardStats(projectId, campaignId, filter) {
+        const matchQuery = { projectId, campaignId, isDeleted: false };
+        if (filter?.nodeId && filter.nodeId !== 'GLOBAL') {
+            matchQuery.nodeId = filter.nodeId;
+        }
+        if (filter?.demographicFilters) {
+            const filterConditions = [];
+            for (const [k, v] of Object.entries(filter.demographicFilters)) {
+                if (v && v !== 'ALL' && typeof v === 'string') {
+                    const kLower = k.toLowerCase();
+                    const escapedV = v.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                    const regex = new RegExp(`^${escapedV}$`, 'i');
+                    filterConditions.push({
+                        $or: [
+                            { [`demographicSnapshot.${k}`]: { $regex: regex } },
+                            { [`demographicSnapshot.${kLower}`]: { $regex: regex } },
+                            { 'answers.textValue': { $regex: regex } },
+                            { 'answers.selectedOptions': v },
+                            { 'answers.choiceValues': v },
+                        ],
+                    });
+                }
+            }
+            if (filterConditions.length > 0) {
+                matchQuery.$and = filterConditions;
+            }
+        }
+        const pipeline = [
+            { $match: matchQuery },
+            {
+                $facet: {
+                    total: [{ $count: 'count' }],
+                    npsAnswers: [
+                        { $unwind: '$answers' },
+                        { $match: { 'answers.questionType': 'NPS', 'answers.numericValue': { $ne: null } } },
+                        {
+                            $group: {
+                                _id: null,
+                                totalNps: { $sum: 1 },
+                                avgNpsScore: { $avg: '$answers.numericValue' },
+                                promoters: {
+                                    $sum: { $cond: [{ $gte: ['$answers.numericValue', 9] }, 1, 0] },
+                                },
+                                passives: {
+                                    $sum: {
+                                        $cond: [
+                                            {
+                                                $and: [
+                                                    { $gte: ['$answers.numericValue', 7] },
+                                                    { $lte: ['$answers.numericValue', 8] },
+                                                ],
+                                            },
+                                            1,
+                                            0,
+                                        ],
+                                    },
+                                },
+                                detractors: {
+                                    $sum: { $cond: [{ $lte: ['$answers.numericValue', 6] }, 1, 0] },
+                                },
+                            },
+                        },
+                    ],
+                    dimensionAnswers: [
+                        { $unwind: '$answers' },
+                        {
+                            $match: {
+                                'answers.numericValue': { $ne: null },
+                                'answers.questionType': { $in: ['LIKERT', 'NUMERIC', 'RATING'] },
+                            },
+                        },
+                        {
+                            $group: {
+                                _id: { $ifNull: ['$answers.groupId', '$answers.category', 'general'] },
+                                avgScore: { $avg: '$answers.numericValue' },
+                                count: { $sum: 1 },
+                            },
+                        },
+                        {
+                            $project: {
+                                _id: 0,
+                                groupId: '$_id',
+                                avgScore: '$avgScore',
+                                count: '$count',
+                            },
+                        },
+                    ],
+                },
+            },
+        ];
+        const [result] = await survey_response_schema_1.SurveyResponseModel.aggregate(pipeline);
+        const totalResponses = result?.total?.[0]?.count || 0;
+        const nps = result?.npsAnswers?.[0] || {
+            promoters: 0,
+            passives: 0,
+            detractors: 0,
+            totalNps: 0,
+            avgNpsScore: 0,
+        };
+        const dimensionStats = result?.dimensionAnswers || [];
+        return {
+            totalResponses,
+            npsStats: nps,
+            dimensionStats,
+        };
+    }
+    async aggregateHeatmapByDepartment(projectId, campaignId) {
+        const pipeline = [
+            { $match: { projectId, campaignId, isDeleted: false } },
+            { $unwind: '$answers' },
+            { $match: { 'answers.numericValue': { $ne: null } } },
+            {
+                $group: {
+                    _id: {
+                        nodeId: { $ifNull: ['$nodeId', 'GLOBAL'] },
+                        groupId: {
+                            $cond: [
+                                { $eq: ['$answers.questionType', 'NPS'] },
+                                'enps',
+                                { $ifNull: ['$answers.groupId', '$answers.category', 'growth_learning'] },
+                            ],
+                        },
+                    },
+                    avgScore: { $avg: '$answers.numericValue' },
+                    count: { $sum: 1 },
+                },
+            },
+            {
+                $project: {
+                    _id: 0,
+                    nodeId: '$_id.nodeId',
+                    groupId: '$_id.groupId',
+                    avgScore: '$avgScore',
+                    count: '$count',
+                },
+            },
+        ];
+        return await survey_response_schema_1.SurveyResponseModel.aggregate(pipeline);
+    }
+    async findSubmissionTimestamps(projectId, nodeId) {
+        const query = { projectId, isDeleted: false };
+        if (nodeId && nodeId !== 'GLOBAL') {
+            query.nodeId = nodeId;
+        }
+        const docs = await survey_response_schema_1.SurveyResponseModel.find(query, { submittedAt: 1 }).lean();
+        return docs.map((d) => d.submittedAt).filter(Boolean);
+    }
 }
 exports.SurveyResponseMongoRepository = SurveyResponseMongoRepository;
 //# sourceMappingURL=survey-response.repository.js.map

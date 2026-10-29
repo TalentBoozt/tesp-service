@@ -19,19 +19,50 @@ class MockLocalAdapter {
         };
     }
     async generateExecutiveSummary(nodeId, sanitizedComments) {
+        if (!sanitizedComments || sanitizedComments.length === 0) {
+            return {
+                strengths: [],
+                concerns: [],
+                recommendations: [],
+            };
+        }
+        const analyzed = sanitizedComments.map((text) => ({
+            text,
+            sentiment: this.sentimentClassifier.classifyText(text),
+            themes: this.themeClustering.extractThemes(text),
+        }));
+        const pos = analyzed.filter((a) => a.sentiment.sentimentLabel === 'POSITIVE');
+        const neg = analyzed.filter((a) => a.sentiment.sentimentLabel === 'NEGATIVE');
+        const strengths = [];
+        for (const p of pos.slice(0, 3)) {
+            const theme = p.themes[0] || 'Workplace Atmosphere';
+            strengths.push(`Positive feedback regarding ${theme}: "${p.text}"`);
+        }
+        if (strengths.length === 0 && pos.length === 0) {
+            strengths.push('Team maintains baseline performance and steady operational continuity.');
+        }
+        const concerns = [];
+        for (const n of neg.slice(0, 3)) {
+            const theme = n.themes[0] || 'Workplace Environment';
+            concerns.push(`Identified area of friction in ${theme}: "${n.text}"`);
+        }
+        if (concerns.length === 0) {
+            concerns.push('No severe qualitative concerns flagged in submitted responses.');
+        }
+        const recommendations = [];
+        if (neg.length > 0) {
+            const negThemes = Array.from(new Set(neg.flatMap((n) => n.themes)));
+            for (const t of negThemes.slice(0, 3)) {
+                recommendations.push(`Initiate management action plan to address reported ${t} concerns.`);
+            }
+        }
+        else {
+            recommendations.push('Maintain active listening channels and continue current supportive practices.');
+        }
         return {
-            strengths: [
-                'Demonstrated strong team cohesion and supportive supervisor guidance.',
-                'High employee engagement regarding recent professional learning initiatives.',
-            ],
-            concerns: [
-                'Occasional equipment maintenance delays affecting productivity.',
-                'Need for clearer operational communication during shift transitions.',
-            ],
-            recommendations: [
-                'Implement preventive equipment maintenance checks.',
-                'Standardize shift handover communication protocols.',
-            ],
+            strengths,
+            concerns,
+            recommendations,
         };
     }
 }

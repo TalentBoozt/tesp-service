@@ -829,3 +829,25 @@ export declare const QuestionLibrarySchema: z.ZodObject<{
         scoreValue?: number | undefined;
     }[] | undefined;
 }>;
+export declare const InstantiateSurveyTemplateSchema: z.ZodObject<{
+    projectId: z.ZodString;
+    templateId: z.ZodString;
+    surveyId: z.ZodString;
+    title: z.ZodUnion<[z.ZodString, z.ZodEffects<z.ZodRecord<z.ZodString, z.ZodString>, Record<string, string>, Record<string, string>>]>;
+    description: z.ZodOptional<z.ZodUnion<[z.ZodString, z.ZodRecord<z.ZodString, z.ZodString>]>>;
+    anonymous: z.ZodOptional<z.ZodBoolean>;
+}, "strip", z.ZodTypeAny, {
+    projectId: string;
+    surveyId: string;
+    title: string | Record<string, string>;
+    templateId: string;
+    description?: string | Record<string, string> | undefined;
+    anonymous?: boolean | undefined;
+}, {
+    projectId: string;
+    surveyId: string;
+    title: string | Record<string, string>;
+    templateId: string;
+    description?: string | Record<string, string> | undefined;
+    anonymous?: boolean | undefined;
+}>;

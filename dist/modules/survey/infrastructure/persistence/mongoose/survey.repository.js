@@ -1,6 +1,10 @@
 "use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.SurveyMongoRepository = void 0;
+const mongoose_1 = __importDefault(require("mongoose"));
 const survey_entity_1 = require("../../../domain/entities/survey.entity");
 const question_library_entity_1 = require("../../../domain/entities/question-library.entity");
 const survey_schema_1 = require("./survey.schema");
@@ -57,6 +61,9 @@ class SurveyMongoRepository {
         return this.toEntity(doc);
     }
     async findBySurveyId(projectId, surveyId, version) {
+        if (mongoose_1.default.connection.readyState !== 1) {
+            return null;
+        }
         const query = { projectId, surveyId, isDeleted: false };
         if (version !== undefined) {
             query.version = version;

@@ -4,6 +4,10 @@ import { RedisTokenRepository } from '../../infrastructure/cache/redis-token.rep
 import { CampaignEntity, AnonymityLevel, DistributionChannel } from '../../domain/entities/campaign.entity';
 import { ISurveyRepository } from '../../../survey/domain/repositories/survey.repository.interface';
 import { IEmployeeRepository } from '../../../employee/domain/repositories/employee.repository.interface';
+import { IOrgNodeRepository } from '../../../organization/domain/repositories/org-node.repository.interface';
+export declare class EmptyTargetAudienceError extends Error {
+    constructor(message?: string);
+}
 export interface LaunchCampaignCommand {
     projectId: string;
     campaignId: string;
@@ -24,14 +28,17 @@ export interface LaunchCampaignCommand {
     expirationDate: Date;
     targetEmployeesCount?: number;
 }
+import { IEventBus } from '../../../../shared/domain/events/event-bus';
 export declare class LaunchCampaignUseCase {
     private campaignRepo;
     private vaultRepo;
     private redisRepo;
     private surveyRepo?;
     private employeeRepo?;
+    private eventBus;
+    private orgNodeRepo?;
     private tokenGenerator;
     private notificationDispatcher;
-    constructor(campaignRepo: ISurveyCampaignRepository, vaultRepo: ITokenVaultRepository, redisRepo: RedisTokenRepository, surveyRepo?: ISurveyRepository | undefined, employeeRepo?: IEmployeeRepository | undefined);
+    constructor(campaignRepo: ISurveyCampaignRepository, vaultRepo: ITokenVaultRepository, redisRepo: RedisTokenRepository, surveyRepo?: ISurveyRepository | undefined, employeeRepo?: IEmployeeRepository | undefined, eventBus?: IEventBus, orgNodeRepo?: IOrgNodeRepository | undefined);
     execute(command: LaunchCampaignCommand): Promise<CampaignEntity>;
 }

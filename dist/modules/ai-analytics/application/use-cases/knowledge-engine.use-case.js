@@ -1,25 +1,40 @@
 "use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.KnowledgeEngineUseCase = void 0;
+const crypto_1 = require("crypto");
+const mongoose_1 = __importDefault(require("mongoose"));
+const knowledge_repository_1 = require("../../infrastructure/persistence/mongoose/knowledge.repository");
 class KnowledgeEngineUseCase {
-    static policyStore = new Map();
+    repository;
+    constructor(repository) {
+        if (repository) {
+            this.repository = repository;
+        }
+        else if (mongoose_1.default.connection?.readyState === 1) {
+            this.repository = new knowledge_repository_1.KnowledgeMongoRepository();
+        }
+        else {
+            this.repository = new knowledge_repository_1.InMemoryKnowledgeRepository();
+        }
+    }
     async ingestPolicyDocument(projectId, title, category, content) {
         const doc = {
-            documentId: `DOC-POL-${Math.floor(10000 + Math.random() * 90000)}`,
+            documentId: `DOC-POL-${(0, crypto_1.randomUUID)()}`,
             projectId,
             title,
             category,
             content,
-            vectorId: `VEC-${Math.floor(100000 + Math.random() * 900000)}`,
+            vectorId: `VEC-${(0, crypto_1.randomUUID)()}`,
             createdAt: new Date(),
         };
-        const existing = KnowledgeEngineUseCase.policyStore.get(projectId) || [];
-        existing.push(doc);
-        KnowledgeEngineUseCase.policyStore.set(projectId, existing);
+        await this.repository.save(doc);
         return doc;
     }
     async matchPolicyContext(projectId, topicOrGroupId) {
-        const docs = KnowledgeEngineUseCase.policyStore.get(projectId) || [];
+        const docs = await this.repository.findByProjectId(projectId);
         if (docs.length === 0) {
             // Default baseline enterprise policy match
             return [

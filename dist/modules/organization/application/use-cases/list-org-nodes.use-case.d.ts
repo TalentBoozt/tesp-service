@@ -1,8 +1,10 @@
 import { IOrgNodeRepository } from '../../domain/repositories/org-node.repository.interface';
 import { OrgNodeEntity } from '../../domain/entities/org-node.entity';
+import { IEmployeeRepository } from '../../../employee/domain/repositories/employee.repository.interface';
 export declare class ListOrgNodesUseCase {
     private repository;
-    constructor(repository: IOrgNodeRepository);
+    private employeeRepo?;
+    constructor(repository: IOrgNodeRepository, employeeRepo?: IEmployeeRepository);
     execute(projectId: string, options?: {
         parentId?: string | null;
         type?: string;

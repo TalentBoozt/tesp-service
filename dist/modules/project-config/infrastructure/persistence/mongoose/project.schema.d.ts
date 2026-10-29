@@ -66,6 +66,26 @@ export interface IProjectDocument extends Document {
         storageQuotaMb: number;
     };
     licenseExpiresAt?: Date;
+    customDomain?: {
+        hostname: string;
+        verified: boolean;
+        verifiedAt?: Date;
+        cnameTarget?: string;
+        sslStatus?: 'ACTIVE' | 'PENDING_DNS' | 'FAILED';
+    };
+    samlConfig?: {
+        enabled: boolean;
+        protocol?: 'SAML_2' | 'OIDC_PKCE';
+        issuerUrl?: string;
+        clientIdOrEntityId?: string;
+        metadataUrlOrCert?: string;
+        enforceSsoOnly?: boolean;
+        ssoLoginUrl?: string;
+    };
+    benchmarkSettings?: {
+        overallScoreBenchmark?: number;
+        dimensionBenchmarks?: Record<string, number>;
+    };
     version: number;
     isDeleted: boolean;
     createdAt: Date;

@@ -5,6 +5,7 @@ const ai_copilot_use_case_1 = require("../../application/use-cases/ai-copilot.us
 const knowledge_engine_use_case_1 = require("../../application/use-cases/knowledge-engine.use-case");
 const ai_analytics_dto_1 = require("../../application/dto/ai-analytics.dto");
 const error_middleware_1 = require("../../../../shared/presentation/middleware/error.middleware");
+const tenant_context_1 = require("../../../../shared/presentation/utils/tenant-context");
 class AiAnalyticsController {
     analyzeTextResponsesUseCase;
     getExecutiveSummaryUseCase;
@@ -23,7 +24,7 @@ class AiAnalyticsController {
     analyzeCampaign = async (req, res, next) => {
         try {
             const { campaignId, projectId: bodyProjectId } = req.body;
-            const projectId = bodyProjectId || req.user?.projectId || 'PRJ-DEFAULT';
+            const projectId = (0, tenant_context_1.resolveTenantProjectId)(req, bodyProjectId);
             if (!campaignId) {
                 throw new error_middleware_1.AppError(400, 'campaignId is required in body');
             }
@@ -37,7 +38,7 @@ class AiAnalyticsController {
     getSummary = async (req, res, next) => {
         try {
             const campaignId = req.query.campaignId;
-            const projectId = req.query.projectId || req.user?.projectId || 'PRJ-DEFAULT';
+            const projectId = (0, tenant_context_1.resolveTenantProjectId)(req, req.query.projectId);
             const nodeId = req.query.nodeId || 'GLOBAL';
             if (!campaignId) {
                 throw new error_middleware_1.AppError(400, 'campaignId query parameter is required');
@@ -52,7 +53,7 @@ class AiAnalyticsController {
     overrideSentiment = async (req, res, next) => {
         try {
             const { insightId } = req.params;
-            const projectId = req.query.projectId || req.user?.projectId || 'PRJ-DEFAULT';
+            const projectId = (0, tenant_context_1.resolveTenantProjectId)(req, req.query.projectId);
             const parsed = ai_analytics_dto_1.OverrideSentimentDtoSchema.safeParse(req.body);
             if (!parsed.success) {
                 const detail = parsed.error.errors.map((e) => e.message).join('; ');
@@ -76,7 +77,7 @@ class AiAnalyticsController {
     getRiskAlerts = async (req, res, next) => {
         try {
             const campaignId = req.query.campaignId;
-            const projectId = req.query.projectId || req.user?.projectId || 'PRJ-DEFAULT';
+            const projectId = (0, tenant_context_1.resolveTenantProjectId)(req, req.query.projectId);
             if (!campaignId) {
                 throw new error_middleware_1.AppError(400, 'campaignId query parameter is required');
             }
@@ -94,7 +95,7 @@ class AiAnalyticsController {
     copilotChat = async (req, res, next) => {
         try {
             const { campaignId, query, message, nodeId, projectId: bodyProjectId } = req.body;
-            const projectId = bodyProjectId || req.user?.projectId || 'PRJ-DEFAULT';
+            const projectId = (0, tenant_context_1.resolveTenantProjectId)(req, bodyProjectId);
             const actualQuery = query || message;
             if (!actualQuery || !campaignId) {
                 throw new error_middleware_1.AppError(400, 'query (or message) and campaignId are required');
@@ -115,7 +116,7 @@ class AiAnalyticsController {
     ingestPolicyDocument = async (req, res, next) => {
         try {
             const { title, category, content, projectId: bodyProjectId } = req.body;
-            const projectId = bodyProjectId || req.user?.projectId || 'PRJ-DEFAULT';
+            const projectId = (0, tenant_context_1.resolveTenantProjectId)(req, bodyProjectId);
             if (!title || !category || !content) {
                 throw new error_middleware_1.AppError(400, 'title, category, and content are required');
             }
@@ -133,7 +134,7 @@ class AiAnalyticsController {
     matchPolicyContext = async (req, res, next) => {
         try {
             const topicOrGroupId = req.query.topic || req.query.groupId || 'GENERAL';
-            const projectId = req.query.projectId || req.user?.projectId || 'PRJ-DEFAULT';
+            const projectId = (0, tenant_context_1.resolveTenantProjectId)(req, req.query.projectId);
             const matches = await this.knowledgeEngineUseCase.matchPolicyContext(projectId, topicOrGroupId);
             res.status(200).json({
                 totalMatches: matches.length,

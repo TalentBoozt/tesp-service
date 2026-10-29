@@ -14,6 +14,7 @@ export interface AuthenticatedUser {
     userId: string;
     role: UserRole;
     projectId?: string;
+    name?: string;
     mustChangePassword?: boolean;
     email?: string;
     employeeId?: string;
@@ -31,3 +32,4 @@ export declare function normalizeUserRole(role: string): UserRole;
 export declare function generateToken(payload: AuthenticatedUser): string;
 export declare function authenticate(req: Request, res: Response, next: NextFunction): void;
 export declare function authorize(allowedRoles: UserRole[]): (req: Request, res: Response, next: NextFunction) => void;
+export declare function enforceProjectScope(req: Request, res: Response, next: NextFunction): void;

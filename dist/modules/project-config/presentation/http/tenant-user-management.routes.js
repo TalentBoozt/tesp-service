@@ -46,6 +46,12 @@ function createTenantUserManagementRouter() {
      */
     router.get('/projects/:projectId/users', auth_middleware_1.authenticate, async (req, res, next) => {
         try {
+            if (mongoose_1.default.connection?.readyState !== 1) {
+                return res.status(503).json({
+                    error: 'Service Unavailable',
+                    message: 'Database connection is unavailable. Please retry shortly.',
+                });
+            }
             const { projectId } = req.params;
             const caller = req.user;
             const authorized = await isCallerAuthorizedForProject(caller, projectId, false);
@@ -88,6 +94,12 @@ function createTenantUserManagementRouter() {
      */
     router.post('/projects/:projectId/users', auth_middleware_1.authenticate, async (req, res, next) => {
         try {
+            if (mongoose_1.default.connection?.readyState !== 1) {
+                return res.status(503).json({
+                    error: 'Service Unavailable',
+                    message: 'Database connection is unavailable. Please retry shortly.',
+                });
+            }
             const { projectId } = req.params;
             const caller = req.user;
             const authorized = await isCallerAuthorizedForProject(caller, projectId, true);
@@ -155,35 +167,20 @@ function createTenantUserManagementRouter() {
             }
             else {
                 const userId = `USR-ORG-${crypto_1.default.randomBytes(3).toString('hex').toUpperCase()}`;
-                if (mongoose_1.default.connection?.readyState === 1) {
-                    userDoc = await user_schema_1.UserModel.create({
-                        userId,
-                        email: normalizedEmail,
-                        firstName: firstName.trim(),
-                        lastName: (lastName || '').trim(),
-                        role,
-                        passwordHash,
-                        primaryProjectId: projectId,
-                        authorizedProjectIds: [projectId],
-                        mustChangePassword: true,
-                        failedLoginAttempts: 0,
-                        isActive: true,
-                        isEmailVerified: true,
-                    });
-                }
-                else {
-                    userDoc = {
-                        userId,
-                        email: normalizedEmail,
-                        firstName: firstName.trim(),
-                        lastName: (lastName || '').trim(),
-                        role,
-                        primaryProjectId: projectId,
-                        authorizedProjectIds: [projectId],
-                        mustChangePassword: true,
-                        isActive: true,
-                    };
-                }
+                userDoc = await user_schema_1.UserModel.create({
+                    userId,
+                    email: normalizedEmail,
+                    firstName: firstName.trim(),
+                    lastName: (lastName || '').trim(),
+                    role,
+                    passwordHash,
+                    primaryProjectId: projectId,
+                    authorizedProjectIds: [projectId],
+                    mustChangePassword: true,
+                    failedLoginAttempts: 0,
+                    isActive: true,
+                    isEmailVerified: true,
+                });
             }
             await audit_logger_1.AuditLogger.log({
                 projectId,
@@ -233,6 +230,12 @@ function createTenantUserManagementRouter() {
      */
     router.patch('/projects/:projectId/users/:userId/role', auth_middleware_1.authenticate, async (req, res, next) => {
         try {
+            if (mongoose_1.default.connection?.readyState !== 1) {
+                return res.status(503).json({
+                    error: 'Service Unavailable',
+                    message: 'Database connection is unavailable. Please retry shortly.',
+                });
+            }
             const { projectId, userId } = req.params;
             const { role } = req.body || {};
             const caller = req.user;

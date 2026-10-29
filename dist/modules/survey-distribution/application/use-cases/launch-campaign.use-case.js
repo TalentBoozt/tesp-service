@@ -1,27 +1,53 @@
 "use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.LaunchCampaignUseCase = void 0;
+exports.LaunchCampaignUseCase = exports.EmptyTargetAudienceError = void 0;
+const mongoose_1 = __importDefault(require("mongoose"));
+const crypto_1 = __importDefault(require("crypto"));
 const token_generator_service_1 = require("../../domain/services/token-generator.service");
 const notification_dispatcher_adapter_1 = require("../adapters/notification-dispatcher.adapter");
 const campaign_entity_1 = require("../../domain/entities/campaign.entity");
 const token_vault_entity_1 = require("../../domain/entities/token-vault.entity");
 const campaign_launched_event_1 = require("../../domain/events/campaign-launched.event");
+const org_node_repository_1 = require("../../../organization/infrastructure/persistence/mongoose/org-node.repository");
+class EmptyTargetAudienceError extends Error {
+    constructor(message = 'Cannot launch campaign: target organizational node contains 0 eligible active employees') {
+        super(message);
+        this.name = 'EmptyTargetAudienceError';
+    }
+}
+exports.EmptyTargetAudienceError = EmptyTargetAudienceError;
+const event_bus_1 = require("../../../../shared/domain/events/event-bus");
 class LaunchCampaignUseCase {
     campaignRepo;
     vaultRepo;
     redisRepo;
     surveyRepo;
     employeeRepo;
+    eventBus;
+    orgNodeRepo;
     tokenGenerator;
     notificationDispatcher;
-    constructor(campaignRepo, vaultRepo, redisRepo, surveyRepo, employeeRepo) {
+    constructor(campaignRepo, vaultRepo, redisRepo, surveyRepo, employeeRepo, eventBus = event_bus_1.DomainEventBus.getInstance(), orgNodeRepo) {
         this.campaignRepo = campaignRepo;
         this.vaultRepo = vaultRepo;
         this.redisRepo = redisRepo;
         this.surveyRepo = surveyRepo;
         this.employeeRepo = employeeRepo;
+        this.eventBus = eventBus;
+        this.orgNodeRepo = orgNodeRepo;
         this.tokenGenerator = new token_generator_service_1.TokenGeneratorService();
         this.notificationDispatcher = new notification_dispatcher_adapter_1.NotificationDispatcherAdapter();
+        if (!this.orgNodeRepo && mongoose_1.default.connection?.readyState === 1) {
+            try {
+                this.orgNodeRepo = new org_node_repository_1.OrgNodeMongoRepository();
+            }
+            catch {
+                // Fallback for isolated unit tests without mongoose connection
+            }
+        }
     }
     async execute(command) {
         // 1. Check if campaignId already exists
@@ -39,30 +65,93 @@ class LaunchCampaignUseCase {
                 throw new Error(`Target survey is not published (current status: '${survey.status}')`);
             }
         }
-        // 3. Resolve target audience employee records
+        // 3. Resolve target audience employee records with materialized path & demographic expansion
         const targetEmployees = [];
-        if (this.employeeRepo && command.targetAudience?.nodeIds && command.targetAudience.nodeIds.length > 0) {
-            for (const nodeId of command.targetAudience.nodeIds) {
-                const result = await this.employeeRepo.findAll(command.projectId, { nodeId, limit: 50000 });
-                targetEmployees.push(...result.employees.map((e) => ({
-                    employeeId: e.employeeId,
-                    email: e.email,
-                    phone: e.phoneNumber,
-                    nodeId: e.nodeId,
-                })));
+        const seenEmployeeIds = new Set();
+        if (this.employeeRepo) {
+            const targetNodeIds = new Set();
+            if (command.targetAudience?.nodeIds && command.targetAudience.nodeIds.length > 0) {
+                for (const nodeId of command.targetAudience.nodeIds) {
+                    targetNodeIds.add(nodeId);
+                    if (this.orgNodeRepo) {
+                        try {
+                            const node = await this.orgNodeRepo.findByNodeId(command.projectId, nodeId);
+                            if (node && node.path) {
+                                const descendants = await this.orgNodeRepo.findSubTree(command.projectId, node.path);
+                                for (const sub of descendants) {
+                                    targetNodeIds.add(sub.nodeId);
+                                }
+                            }
+                        }
+                        catch {
+                            // Fallback to direct nodeId if subtree resolution fails
+                        }
+                    }
+                }
+            }
+            const demographicFilters = command.targetAudience?.demographicFilters;
+            const evaluateDemographics = (emp) => {
+                if (!demographicFilters || Object.keys(demographicFilters).length === 0) {
+                    return true;
+                }
+                const attrs = emp.attributes || {};
+                for (const [key, filterValue] of Object.entries(demographicFilters)) {
+                    if (filterValue === undefined || filterValue === null || filterValue === '')
+                        continue;
+                    const actualValue = attrs[key] !== undefined ? attrs[key] : emp[key];
+                    if (Array.isArray(filterValue)) {
+                        if (!filterValue.includes(actualValue))
+                            return false;
+                    }
+                    else if (typeof filterValue === 'object') {
+                        if (filterValue.$eq !== undefined && actualValue !== filterValue.$eq)
+                            return false;
+                        if (filterValue.$in !== undefined && !filterValue.$in.includes(actualValue))
+                            return false;
+                    }
+                    else {
+                        if (String(actualValue).toLowerCase() !== String(filterValue).toLowerCase()) {
+                            return false;
+                        }
+                    }
+                }
+                return true;
+            };
+            if (targetNodeIds.size > 0) {
+                for (const nodeId of targetNodeIds) {
+                    const result = await this.employeeRepo.findAll(command.projectId, { nodeId, limit: 50000 });
+                    for (const e of result.employees) {
+                        if (!seenEmployeeIds.has(e.employeeId) && evaluateDemographics(e)) {
+                            seenEmployeeIds.add(e.employeeId);
+                            targetEmployees.push({
+                                employeeId: e.employeeId,
+                                email: e.email,
+                                phone: e.phoneNumber,
+                                nodeId: e.nodeId,
+                            });
+                        }
+                    }
+                }
+            }
+            else {
+                const result = await this.employeeRepo.findAll(command.projectId, { limit: 50000 });
+                for (const e of result.employees) {
+                    if (!seenEmployeeIds.has(e.employeeId) && evaluateDemographics(e)) {
+                        seenEmployeeIds.add(e.employeeId);
+                        targetEmployees.push({
+                            employeeId: e.employeeId,
+                            email: e.email,
+                            phone: e.phoneNumber,
+                            nodeId: e.nodeId,
+                        });
+                    }
+                }
             }
         }
-        // Fallback: If no explicit employees returned, generate requested target count or default
-        const targetCount = command.targetEmployeesCount || (targetEmployees.length > 0 ? targetEmployees.length : 1);
+        // Fail-fast guard: If target audience contains 0 employees, reject launch without synthesizing fake audience (GAP-009)
         if (targetEmployees.length === 0) {
-            for (let i = 1; i <= targetCount; i++) {
-                targetEmployees.push({
-                    employeeId: `EMP-${1000 + i}`,
-                    email: `employee${i}@company.com`,
-                    phone: `+1555000100${i}`,
-                    nodeId: command.targetAudience?.nodeIds?.[0] || 'N-101',
-                });
-            }
+            const nodeInfo = command.targetAudience?.nodeIds?.join(', ') || 'unspecified';
+            throw new EmptyTargetAudienceError(`Target audience is empty for node(s): ${nodeInfo}. Cannot launch campaign: target organizational node contains 0 eligible active employees.`);
         }
         // Format schedule reminder dates
         const reminderDatesFormatted = command.schedule?.reminderDates
@@ -104,10 +193,10 @@ class LaunchCampaignUseCase {
             let channel;
             if (!hasEmail) {
                 hasGroundWorkersWithoutEmail = true;
-                // Ground Worker without corporate email: Generate collision-free 6-digit PIN
-                let pin = Math.floor(100000 + Math.random() * 900000).toString();
+                // Ground Worker without corporate email: Generate collision-free 6-digit PIN using CSPRNG (GAP-005)
+                let pin = crypto_1.default.randomInt(100000, 1000000).toString();
                 while (generatedPins.has(pin)) {
-                    pin = Math.floor(100000 + Math.random() * 900000).toString();
+                    pin = crypto_1.default.randomInt(100000, 1000000).toString();
                 }
                 generatedPins.add(pin);
                 token = pin;
@@ -117,11 +206,12 @@ class LaunchCampaignUseCase {
                 token = this.tokenGenerator.generateToken(command.anonymityLevel, command.campaignId, emp.employeeId);
                 channel = 'EMAIL';
             }
+            const tokenHash = crypto_1.default.createHash('sha256').update(token).digest('hex');
             vaultEntities.push(new token_vault_entity_1.TokenVaultEntity({
                 projectId: command.projectId,
                 campaignId: command.campaignId,
                 token,
-                tokenHash: token,
+                tokenHash,
                 channel,
                 employeeId: command.anonymityLevel === campaign_entity_1.AnonymityLevel.FULLY_ANONYMOUS ? undefined : emp.employeeId,
                 nodeId: emp.nodeId,
@@ -179,12 +269,13 @@ class LaunchCampaignUseCase {
         });
         if (dispatchResult.success) {
             campaign.metrics.sent = targetEmployees.length;
-            campaign.metrics.delivered = targetEmployees.length;
+            campaign.metrics.delivered = 0;
+            campaign.metrics.bounced = 0;
         }
         // 9. Save and return Campaign
         const savedCampaign = await this.campaignRepo.save(campaign);
         // Publish In-Process Domain Event (FR-DST-006)
-        new campaign_launched_event_1.CampaignLaunchedEvent({
+        const event = new campaign_launched_event_1.CampaignLaunchedEvent({
             projectId: command.projectId,
             campaignId: command.campaignId,
             surveyId: command.surveyId,
@@ -192,6 +283,7 @@ class LaunchCampaignUseCase {
             totalTargeted: targetEmployees.length,
             anonymityLevel: command.anonymityLevel,
         });
+        await this.eventBus.publish(event);
         return savedCampaign;
     }
 }

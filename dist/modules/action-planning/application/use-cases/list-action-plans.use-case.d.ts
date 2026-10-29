@@ -6,6 +6,7 @@ export interface KanbanBoardResult {
     APPROVED: ActionPlanEntity[];
     REJECTED: ActionPlanEntity[];
     IN_PROGRESS: ActionPlanEntity[];
+    ACTIVE?: ActionPlanEntity[];
     COMPLETED: ActionPlanEntity[];
     VERIFIED: ActionPlanEntity[];
     CANCELLED: ActionPlanEntity[];

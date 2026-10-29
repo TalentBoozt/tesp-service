@@ -4,6 +4,7 @@ import { IExternalTaskAdapter } from '../adapters/external-task.adapter.interfac
 export declare class SyncExternalTaskUseCase {
     private actionPlanRepo;
     private externalAdapter;
-    constructor(actionPlanRepo: IActionPlanRepository, externalAdapter?: IExternalTaskAdapter);
-    execute(projectId: string, actionPlanId: string, system: 'JIRA' | 'MS_PLANNER'): Promise<ActionPlanEntity>;
+    private projectRepo?;
+    constructor(actionPlanRepo: IActionPlanRepository, externalAdapter?: IExternalTaskAdapter, projectRepo?: any | undefined);
+    execute(projectId: string, actionPlanId: string, system: 'JIRA' | 'MS_PLANNER', options?: any): Promise<ActionPlanEntity>;
 }

@@ -36,6 +36,8 @@ exports.WebhookPayloadDtoSchema = zod_1.z.object({
     eventType: zod_1.z.enum(['DELIVERED', 'OPENED', 'BOUNCED', 'FAILED']),
     projectId: zod_1.z.string().min(1),
     campaignId: zod_1.z.string().min(1),
+    eventId: zod_1.z.string().optional(),
+    messageId: zod_1.z.string().optional(),
     recipientEmail: zod_1.z.string().email().optional(),
     recipientPhone: zod_1.z.string().optional(),
     timestamp: zod_1.z.string().optional(),

@@ -10,6 +10,7 @@ const project_schema_1 = require("../../infrastructure/persistence/mongoose/proj
 const employee_schema_1 = require("../../../employee/infrastructure/persistence/mongoose/employee.schema");
 const survey_schema_1 = require("../../../survey/infrastructure/persistence/mongoose/survey.schema");
 const campaign_schema_1 = require("../../../survey-distribution/infrastructure/persistence/mongoose/campaign.schema");
+const token_vault_schema_1 = require("../../../survey-distribution/infrastructure/persistence/mongoose/token-vault.schema");
 const survey_response_schema_1 = require("../../../response-intake/infrastructure/persistence/mongoose/survey-response.schema");
 const audit_log_schema_1 = require("../../../audit-log/infrastructure/persistence/mongoose/audit-log.schema");
 const user_schema_1 = require("../../../auth/infrastructure/persistence/user.schema");
@@ -21,6 +22,7 @@ const audit_logger_1 = require("../../../../shared/infrastructure/audit/audit-lo
 const auth_middleware_1 = require("../../../../shared/presentation/middleware/auth.middleware");
 const event_bus_1 = require("../../../../shared/domain/events/event-bus");
 const system_email_service_1 = require("../../../../shared/infrastructure/email/system-email.service");
+const config_1 = require("../../../../config");
 const crypto_1 = __importDefault(require("crypto"));
 function createTenantManagementRouter() {
     const router = (0, express_1.Router)();
@@ -33,26 +35,9 @@ function createTenantManagementRouter() {
     router.get('/admin/overview', async (_req, res, next) => {
         try {
             if (mongoose_1.default.connection?.readyState !== 1) {
-                return res.status(200).json({
-                    totalTenants: 1,
-                    totalClientProjects: 2,
-                    totalEmployees: 250,
-                    totalSurveys: 3,
-                    totalCampaigns: 4,
-                    totalResponses: 185,
-                    totalAuditLogs: 12,
-                    globalResponseCap: 100000,
-                    globalAiTokenCap: 2000000,
-                    quotaUtilizationPercent: 0.2,
-                    infrastructure: {
-                        clusterStatus: 'HEALTHY',
-                        workerNodes: 2,
-                        dbState: 'CONNECTED',
-                        databaseCluster: 'MongoDB Atlas (ap-southeast-1)',
-                        redisCache: 'CONNECTED',
-                        vaultStatus: 'SEALED (ISO 27001 / SOC 2)',
-                        rateLimiterStatus: 'ACTIVE (120 req/min)',
-                    },
+                return res.status(503).json({
+                    error: 'Service Unavailable',
+                    message: 'Database connection is unavailable. Please retry shortly.',
                 });
             }
             const [projects, totalEmployees, totalSurveys, totalCampaigns, totalResponses, totalAuditLogs,] = await Promise.all([
@@ -70,6 +55,34 @@ function createTenantManagementRouter() {
                 globalResponseCap += p.budgets?.monthlyResponseCap || 50000;
                 globalAiTokenCap += p.budgets?.aiTokenCap || 1000000;
             }
+            let totalVaultTokens = 0;
+            try {
+                if (mongoose_1.default.connection?.readyState === 1 && typeof token_vault_schema_1.TokenVaultModel?.countDocuments === 'function') {
+                    totalVaultTokens = await Promise.race([
+                        token_vault_schema_1.TokenVaultModel.countDocuments({}),
+                        new Promise((resolve) => setTimeout(() => resolve(0), 100)),
+                    ]);
+                }
+            }
+            catch {
+                totalVaultTokens = 0;
+            }
+            const isEncryptionKeyConfigured = Boolean(process.env.FIELD_ENCRYPTION_KEY &&
+                process.env.FIELD_ENCRYPTION_KEY !== 'tesp-field-encryption-master-secret-2026');
+            const isBlindIndexKeyConfigured = Boolean(process.env.BLIND_INDEX_KEY &&
+                process.env.BLIND_INDEX_KEY !== 'tesp-blind-index-hmac-secret-2026');
+            const isKeyConfigured = isEncryptionKeyConfigured && isBlindIndexKeyConfigured;
+            let vaultStatus;
+            if (process.env.NODE_ENV === 'production') {
+                vaultStatus = isKeyConfigured
+                    ? `SEALED (ACTIVE / ${totalVaultTokens} tokens secured)`
+                    : 'DEGRADED (UNCONFIGURED_MASTER_KEY)';
+            }
+            else {
+                vaultStatus = totalVaultTokens > 0
+                    ? `ACTIVE (${totalVaultTokens} tokens secured)`
+                    : 'SEALED (KEYS_VERIFIED)';
+            }
             res.status(200).json({
                 totalTenants: tenantIds.size || 1,
                 totalClientProjects: projects.length,
@@ -82,13 +95,13 @@ function createTenantManagementRouter() {
                 globalAiTokenCap,
                 quotaUtilizationPercent: globalResponseCap > 0 ? Number(((totalResponses / globalResponseCap) * 100).toFixed(1)) : 0,
                 infrastructure: {
-                    clusterStatus: 'HEALTHY',
-                    workerNodes: 2,
-                    dbState: 'CONNECTED',
-                    databaseCluster: 'MongoDB Atlas (ap-southeast-1)',
-                    redisCache: 'CONNECTED',
-                    vaultStatus: 'SEALED (ISO 27001 / SOC 2)',
-                    rateLimiterStatus: 'ACTIVE (120 req/min)',
+                    clusterStatus: mongoose_1.default.connection?.readyState === 1 ? 'HEALTHY' : 'DEGRADED',
+                    workerNodes: Number(process.env.WORKER_NODES || 1),
+                    dbState: mongoose_1.default.connection?.readyState === 1 ? 'CONNECTED' : 'DISCONNECTED',
+                    databaseCluster: 'MongoDB Atlas',
+                    redisCache: (config_1.config.upstashRedisRestUrl || process.env.UPSTASH_REDIS_REST_URL || process.env.REDIS_URL) ? 'CONNECTED' : 'IN_MEMORY',
+                    vaultStatus,
+                    rateLimiterStatus: 'ACTIVE',
                 },
             });
         }
@@ -97,58 +110,34 @@ function createTenantManagementRouter() {
         }
     });
     /**
+     * GET /api/v1/admin/infrastructure
+     * Live Infrastructure Telemetry
+     */
+    router.get('/admin/infrastructure', async (_req, res) => {
+        const isConnected = mongoose_1.default.connection?.readyState === 1;
+        res.status(200).json({
+            clusterStatus: isConnected ? 'HEALTHY' : 'DEGRADED',
+            database: {
+                connected: isConnected,
+                readyState: mongoose_1.default.connection?.readyState ?? 0,
+            },
+            process: {
+                uptime: process.uptime(),
+                memoryUsage: process.memoryUsage(),
+            },
+        });
+    });
+    /**
      * GET /api/v1/admin/tenants
      * Returns all client projects grouped with their consulting tenant, budgets, and live metrics
      */
     router.get('/admin/tenants', async (_req, res, next) => {
         try {
             if (mongoose_1.default.connection?.readyState !== 1) {
-                return res.status(200).json([
-                    {
-                        id: 'PRJ-99201',
-                        projectId: 'PRJ-99201',
-                        name: 'Aitken Spence Enterprise Survey',
-                        clientOrgName: 'Aitken Spence PLC',
-                        tenantId: 'TENANT-DAASH',
-                        tenantName: 'Daash Global Advisory',
-                        tier: 'ENTERPRISE',
-                        status: 'ACTIVE',
-                        branding: { companyName: 'Aitken Spence PLC', primaryColor: '#0157C8', secondaryColor: '#0A1317' },
-                        supportedLocales: ['en-US', 'si-LK', 'ta-LK'],
-                        budgets: {
-                            monthlyResponseCap: 50000,
-                            responsesConsumed: 124,
-                            aiTokenCap: 1000000,
-                            aiTokensConsumed: 8400,
-                            maxEmployees: 5000,
-                            storageQuotaMb: 5000,
-                        },
-                        metrics: { employeeCount: 142, surveyCount: 2, campaignCount: 2, responseCount: 124 },
-                        licenseExpiresAt: '2027-12-31T23:59:59.000Z',
-                    },
-                    {
-                        id: 'PRJ-APAC01',
-                        projectId: 'PRJ-APAC01',
-                        name: 'Dialog Axiata Digital Pulse',
-                        clientOrgName: 'Dialog Axiata PLC',
-                        tenantId: 'TENANT-DAASH',
-                        tenantName: 'Daash Global Advisory',
-                        tier: 'SCALE',
-                        status: 'ACTIVE',
-                        branding: { companyName: 'Dialog Axiata', primaryColor: '#0D9488', secondaryColor: '#134E4A' },
-                        supportedLocales: ['en-US', 'ta-LK'],
-                        budgets: {
-                            monthlyResponseCap: 30000,
-                            responsesConsumed: 61,
-                            aiTokenCap: 500000,
-                            aiTokensConsumed: 4100,
-                            maxEmployees: 2500,
-                            storageQuotaMb: 3000,
-                        },
-                        metrics: { employeeCount: 95, surveyCount: 1, campaignCount: 1, responseCount: 61 },
-                        licenseExpiresAt: '2027-12-31T23:59:59.000Z',
-                    },
-                ]);
+                return res.status(503).json({
+                    error: 'Service Unavailable',
+                    message: 'Database connection is unavailable. Please retry shortly.',
+                });
             }
             const projects = await project_schema_1.ProjectModel.find({ isDeleted: { $ne: true } })
                 .sort({ createdAt: -1 })
@@ -216,14 +205,9 @@ function createTenantManagementRouter() {
                 });
             }
             if (mongoose_1.default.connection?.readyState !== 1) {
-                return res.status(201).json({
-                    projectId,
-                    name,
-                    clientOrgName: clientOrgName || name,
-                    tenantId: tenantId || 'TENANT-DAASH',
-                    tenantName: tenantName || 'Daash Global Advisory',
-                    tier: tier || 'ENTERPRISE',
-                    status: 'ACTIVE',
+                return res.status(503).json({
+                    error: 'Service Unavailable',
+                    message: 'Database connection is unavailable. Please retry shortly.',
                 });
             }
             // Check unique projectId
@@ -302,13 +286,9 @@ function createTenantManagementRouter() {
             const { projectId } = req.params;
             const { monthlyResponseCap, aiTokenCap, maxEmployees, storageQuotaMb, tier } = req.body;
             if (mongoose_1.default.connection?.readyState !== 1) {
-                return res.status(200).json({
-                    message: 'Tenant quotas and budget updated successfully',
-                    budgets: {
-                        monthlyResponseCap: Number(monthlyResponseCap) || 75000,
-                        aiTokenCap: Number(aiTokenCap) || 2000000,
-                        tier: tier || 'SCALE',
-                    },
+                return res.status(503).json({
+                    error: 'Service Unavailable',
+                    message: 'Database connection is unavailable. Please retry shortly.',
                 });
             }
             const project = await project_schema_1.ProjectModel.findOne({ projectId });
@@ -370,6 +350,12 @@ function createTenantManagementRouter() {
      */
     router.post('/admin/consultants', async (req, res, next) => {
         try {
+            if (mongoose_1.default.connection?.readyState !== 1) {
+                return res.status(503).json({
+                    error: 'Service Unavailable',
+                    message: 'Database connection is unavailable. Please retry shortly.',
+                });
+            }
             const { email, firstName, lastName, firmId, authorizedProjectIds, temporaryPassword } = req.body || {};
             if (!email || !firstName || !lastName || !firmId || !temporaryPassword) {
                 return res.status(400).json({
@@ -422,8 +408,16 @@ function createTenantManagementRouter() {
             const userId = `USR-CONS-${randomHex}`;
             const projectList = Array.isArray(authorizedProjectIds) && authorizedProjectIds.length > 0
                 ? authorizedProjectIds
-                : (firm.assignedProjectIds && firm.assignedProjectIds.length > 0 ? firm.assignedProjectIds : ['PRJ-99201']);
-            const primaryProjectId = projectList[0] || 'PRJ-99201';
+                : (firm.assignedProjectIds && firm.assignedProjectIds.length > 0 ? firm.assignedProjectIds : []);
+            if (projectList.length === 0) {
+                return res.status(400).json({
+                    type: 'https://tesp-api.talnova.io/errors/bad-request',
+                    title: 'Bad Request',
+                    status: 400,
+                    detail: 'At least one authorized project ID must be assigned to the consultant or firm',
+                });
+            }
+            const primaryProjectId = projectList[0];
             const newDoc = await user_schema_1.UserModel.create({
                 userId,
                 email: normalizedEmail,

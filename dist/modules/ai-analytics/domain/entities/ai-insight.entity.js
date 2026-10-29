@@ -16,6 +16,8 @@ class AiInsightEntity {
     riskFlags;
     humanOverride;
     processedAt;
+    isAiSimulated;
+    fallbackReason;
     constructor(props) {
         if (!props.projectId || !props.campaignId || !props.responseId || !props.questionId) {
             throw new Error('projectId, campaignId, responseId, and questionId are required');
@@ -36,6 +38,8 @@ class AiInsightEntity {
         this.riskFlags = props.riskFlags ? [...props.riskFlags] : [];
         this.humanOverride = props.humanOverride ? { ...props.humanOverride } : undefined;
         this.processedAt = props.processedAt || new Date();
+        this.isAiSimulated = props.isAiSimulated;
+        this.fallbackReason = props.fallbackReason;
     }
     validateInsightId(insightId) {
         const pattern = /^INS-[A-Za-z0-9_-]{3,50}$/;
@@ -67,6 +71,8 @@ class AiInsightEntity {
             riskFlags: this.riskFlags.map((r) => ({ ...r })),
             humanOverride: this.humanOverride ? { ...this.humanOverride } : undefined,
             processedAt: this.processedAt,
+            isAiSimulated: this.isAiSimulated,
+            fallbackReason: this.fallbackReason,
         };
     }
 }

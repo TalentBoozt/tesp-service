@@ -15,7 +15,7 @@ class AiConfig {
         this.provider = props?.provider || 'GEMINI';
         this.apiKey = props?.apiKey;
         this.baseUrl = props?.baseUrl;
-        this.modelName = props?.modelName || (this.provider === 'GEMINI' ? 'gemini-1.5-pro' : this.provider === 'OPENAI' ? 'gpt-4o' : this.provider === 'ANTHROPIC' ? 'claude-3-5-sonnet' : 'mock-model');
+        this.modelName = props?.modelName || (this.provider === 'GEMINI' ? 'gemini-2.5-flash' : this.provider === 'OPENAI' ? 'gpt-4o' : this.provider === 'ANTHROPIC' ? 'claude-3-5-sonnet' : 'mock-model');
         this.maxTokensPerAnalysis = props?.maxTokensPerAnalysis || 4000;
         this.monthlyTokenBudget = props?.monthlyTokenBudget || 1000000;
         this.currentMonthUsage = props?.currentMonthUsage || 0;

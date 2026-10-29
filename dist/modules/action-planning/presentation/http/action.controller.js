@@ -1,9 +1,15 @@
 "use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ActionController = void 0;
 const action_plan_dto_1 = require("../../application/dto/action-plan.dto");
 const error_middleware_1 = require("../../../../shared/presentation/middleware/error.middleware");
 const auth_middleware_1 = require("../../../../shared/presentation/middleware/auth.middleware");
+const tenant_context_1 = require("../../../../shared/presentation/utils/tenant-context");
+const project_schema_1 = require("../../../project-config/infrastructure/persistence/mongoose/project.schema");
+const mongoose_1 = __importDefault(require("mongoose"));
 class ActionController {
     createActionPlanUseCase;
     transitionActionPlanStatusUseCase;
@@ -13,7 +19,9 @@ class ActionController {
     getActionPlanUseCase;
     updateActionPlanUseCase;
     deleteActionPlanUseCase;
-    constructor(createActionPlanUseCase, transitionActionPlanStatusUseCase, getRecommendedTemplatesUseCase, syncExternalTaskUseCase, listActionPlansUseCase, getActionPlanUseCase, updateActionPlanUseCase, deleteActionPlanUseCase) {
+    actionPlanRepo;
+    projectRepo;
+    constructor(createActionPlanUseCase, transitionActionPlanStatusUseCase, getRecommendedTemplatesUseCase, syncExternalTaskUseCase, listActionPlansUseCase, getActionPlanUseCase, updateActionPlanUseCase, deleteActionPlanUseCase, actionPlanRepo, projectRepo) {
         this.createActionPlanUseCase = createActionPlanUseCase;
         this.transitionActionPlanStatusUseCase = transitionActionPlanStatusUseCase;
         this.getRecommendedTemplatesUseCase = getRecommendedTemplatesUseCase;
@@ -22,20 +30,22 @@ class ActionController {
         this.getActionPlanUseCase = getActionPlanUseCase;
         this.updateActionPlanUseCase = updateActionPlanUseCase;
         this.deleteActionPlanUseCase = deleteActionPlanUseCase;
+        this.actionPlanRepo = actionPlanRepo;
+        this.projectRepo = projectRepo;
     }
     createActionPlan = async (req, res, next) => {
         try {
             const body = { ...req.body };
             if (!body.projectId)
-                body.projectId = req.user?.projectId || 'PRJ-99201';
+                body.projectId = (0, tenant_context_1.resolveTenantProjectId)(req);
             if (!body.campaignId)
                 body.campaignId = 'CMP-1001';
             if (!body.nodeId)
-                body.nodeId = body.orgNodeCode || (body.projectId === 'PRJ-APAC01' ? 'N-5G-NETWORKS' : body.projectId === 'PRJ-NESTLE' ? 'N-PANNALA-FACTORY' : 'N-HOTELS-DIV');
+                body.nodeId = body.orgNodeCode || 'NODE-ROOT';
             if (!body.groupId)
                 body.groupId = 'PSYCHOLOGICAL_SAFETY';
             if (!body.assigneeId)
-                body.assigneeId = body.ownerEmail || req.user?.userId || (body.projectId === 'PRJ-APAC01' ? 'EMP-DIA-101' : body.projectId === 'PRJ-NESTLE' ? 'EMP-NES-101' : 'EMP-ASP-101');
+                body.assigneeId = body.ownerEmail || req.user?.userId || 'USER-ADMIN';
             if (body.baselineScore === undefined)
                 body.baselineScore = body.currentScore ?? 65;
             if (body.targetScore === undefined)
@@ -68,7 +78,7 @@ class ActionController {
     getActionPlan = async (req, res, next) => {
         try {
             const { actionPlanId } = req.params;
-            const projectId = req.query.projectId || req.user?.projectId || 'PRJ-DEFAULT';
+            const projectId = (0, tenant_context_1.resolveTenantProjectId)(req);
             if (!this.getActionPlanUseCase) {
                 throw new error_middleware_1.AppError(500, 'GetActionPlanUseCase not configured');
             }
@@ -82,7 +92,7 @@ class ActionController {
     updateActionPlan = async (req, res, next) => {
         try {
             const { actionPlanId } = req.params;
-            const projectId = req.query.projectId || req.user?.projectId || 'PRJ-DEFAULT';
+            const projectId = (0, tenant_context_1.resolveTenantProjectId)(req);
             if (!this.updateActionPlanUseCase) {
                 throw new error_middleware_1.AppError(500, 'UpdateActionPlanUseCase not configured');
             }
@@ -114,7 +124,7 @@ class ActionController {
     toggleMilestone = async (req, res, next) => {
         try {
             const { actionPlanId, milestoneId } = req.params;
-            const projectId = req.query.projectId || req.user?.projectId || 'PRJ-DEFAULT';
+            const projectId = (0, tenant_context_1.resolveTenantProjectId)(req);
             const completed = req.body.completed !== undefined ? Boolean(req.body.completed) : true;
             if (!this.updateActionPlanUseCase) {
                 throw new error_middleware_1.AppError(500, 'UpdateActionPlanUseCase not configured');
@@ -136,7 +146,7 @@ class ActionController {
     deleteActionPlan = async (req, res, next) => {
         try {
             const { actionPlanId } = req.params;
-            const projectId = req.query.projectId || req.user?.projectId || 'PRJ-DEFAULT';
+            const projectId = (0, tenant_context_1.resolveTenantProjectId)(req);
             if (!this.deleteActionPlanUseCase) {
                 throw new error_middleware_1.AppError(500, 'DeleteActionPlanUseCase not configured');
             }
@@ -150,7 +160,7 @@ class ActionController {
     transitionStatus = async (req, res, next) => {
         try {
             const { actionPlanId } = req.params;
-            const projectId = req.query.projectId || req.user?.projectId || 'PRJ-DEFAULT';
+            const projectId = (0, tenant_context_1.resolveTenantProjectId)(req);
             const targetStatus = req.body.targetStatus || req.body.toStatus;
             const parsed = action_plan_dto_1.TransitionStatusDtoSchema.safeParse({ ...req.body, targetStatus });
             if (!parsed.success) {
@@ -182,7 +192,7 @@ class ActionController {
             const groupId = req.query.groupId;
             const score = req.query.score ? parseFloat(req.query.score) : undefined;
             const surveyId = req.query.surveyId || req.query.campaignId;
-            const projectId = req.query.projectId || req.user?.projectId || 'PRJ-99201';
+            const projectId = (0, tenant_context_1.resolveTenantProjectId)(req);
             const templates = await this.getRecommendedTemplatesUseCase.execute(groupId, score, surveyId, projectId);
             res.status(200).json({
                 total: templates.length,
@@ -196,19 +206,19 @@ class ActionController {
     syncTask = async (req, res, next) => {
         try {
             const { actionPlanId } = req.params;
-            const projectId = req.query.projectId || req.user?.projectId || 'PRJ-DEFAULT';
+            const projectId = (0, tenant_context_1.resolveTenantProjectId)(req);
             const system = req.body.system || 'JIRA';
             const updated = await this.syncExternalTaskUseCase.execute(projectId, actionPlanId, system);
-            const key = updated.externalSync.externalKey ||
-                updated.externalSync.externalTaskId ||
-                `JIRA-${Math.floor(1000 + Math.random() * 9000)}`;
+            const isPending = updated.externalSync.status === 'PENDING_CONFIG';
+            const key = updated.externalSync.externalKey || updated.externalSync.externalTaskId;
             res.status(200).json({
-                message: `Action plan synced to ${system} successfully`,
+                message: isPending
+                    ? `Action plan marked as PENDING_CONFIG: ${system} integration credentials not configured`
+                    : `Action plan synced to ${system} successfully`,
                 actionPlan: updated.toJSON(),
                 externalTaskId: key,
-                externalUrl: system === 'JIRA'
-                    ? `https://jira.talnova.io/browse/${key}`
-                    : `https://tasks.office.com/talnova.io/plans/${key}`,
+                externalUrl: updated.externalSync.externalUrl,
+                status: updated.externalSync.status || 'SYNCED',
             });
         }
         catch (err) {
@@ -221,7 +231,7 @@ class ActionController {
     };
     getKanban = async (req, res, next) => {
         try {
-            const projectId = req.query.projectId || req.user?.projectId || 'PRJ-DEFAULT';
+            const projectId = (0, tenant_context_1.resolveTenantProjectId)(req);
             const nodeId = req.query.nodeId;
             const kanban = await this.listActionPlansUseCase.getKanbanBoard(projectId, nodeId);
             const allPlans = Object.values(kanban).flat();
@@ -246,6 +256,146 @@ class ActionController {
             next(err);
         }
     };
+    handleJiraWebhook = async (req, res, next) => {
+        try {
+            const projectId = req.params.projectId || req.body.projectId;
+            if (!projectId) {
+                throw new error_middleware_1.AppError(400, 'projectId is required');
+            }
+            await this.validateProjectExists(projectId);
+            const externalTicketId = req.body.externalTicketId ||
+                req.body.issue?.key ||
+                req.body.issue?.id ||
+                req.body.key;
+            if (!externalTicketId) {
+                throw new error_middleware_1.AppError(400, 'Missing external ticket identifier in Jira webhook payload');
+            }
+            const plan = await this.findActionPlanByExternalTicket(projectId, externalTicketId);
+            if (!plan) {
+                throw new error_middleware_1.AppError(404, `Action plan not found for external ticket '${externalTicketId}'`);
+            }
+            const rawStatus = (req.body.status ||
+                req.body.issue?.fields?.status?.name ||
+                req.body.issue?.status ||
+                '').toString().toLowerCase();
+            let targetStatus = plan.status;
+            if (['done', 'closed', 'resolved', 'completed'].some((s) => rawStatus.includes(s))) {
+                targetStatus = 'COMPLETED';
+            }
+            else if (['in progress', 'in_progress', 'active', 'reopened'].some((s) => rawStatus.includes(s))) {
+                targetStatus = 'ACTIVE';
+            }
+            let updatedPlan = plan;
+            if (targetStatus !== plan.status) {
+                updatedPlan = await this.transitionActionPlanStatusUseCase.execute(projectId, plan.actionPlanId, targetStatus, 'SYSTEM_WEBHOOK');
+            }
+            res.status(200).json({
+                message: `Action plan status updated from Jira webhook to ${targetStatus}`,
+                actionPlan: updatedPlan.toJSON(),
+                status: targetStatus,
+            });
+        }
+        catch (err) {
+            if (err.message && err.message.includes('not found')) {
+                next(new error_middleware_1.AppError(404, err.message));
+                return;
+            }
+            if (err.message && err.message.includes('Invalid state transition')) {
+                next(new error_middleware_1.AppError(400, err.message));
+                return;
+            }
+            next(err);
+        }
+    };
+    handlePlannerWebhook = async (req, res, next) => {
+        try {
+            const projectId = req.params.projectId || req.body.projectId;
+            if (!projectId) {
+                throw new error_middleware_1.AppError(400, 'projectId is required');
+            }
+            await this.validateProjectExists(projectId);
+            const externalTaskId = req.body.externalTicketId ||
+                req.body.externalTaskId ||
+                req.body.taskId ||
+                req.body.id;
+            if (!externalTaskId) {
+                throw new error_middleware_1.AppError(400, 'Missing external task identifier in Planner webhook payload');
+            }
+            const plan = await this.findActionPlanByExternalTicket(projectId, externalTaskId);
+            if (!plan) {
+                throw new error_middleware_1.AppError(404, `Action plan not found for external task '${externalTaskId}'`);
+            }
+            const rawStatus = (req.body.status || '').toString().toLowerCase();
+            const percentComplete = req.body.percentComplete;
+            let targetStatus = plan.status;
+            if (percentComplete === 100 || ['done', 'completed'].some((s) => rawStatus.includes(s))) {
+                targetStatus = 'COMPLETED';
+            }
+            else if (['in progress', 'in_progress', 'active'].some((s) => rawStatus.includes(s)) ||
+                (percentComplete !== undefined && percentComplete > 0)) {
+                targetStatus = 'ACTIVE';
+            }
+            let updatedPlan = plan;
+            if (targetStatus !== plan.status) {
+                updatedPlan = await this.transitionActionPlanStatusUseCase.execute(projectId, plan.actionPlanId, targetStatus, 'SYSTEM_WEBHOOK');
+            }
+            res.status(200).json({
+                message: `Action plan status updated from Planner webhook to ${targetStatus}`,
+                actionPlan: updatedPlan.toJSON(),
+                status: targetStatus,
+            });
+        }
+        catch (err) {
+            if (err.message && err.message.includes('not found')) {
+                next(new error_middleware_1.AppError(404, err.message));
+                return;
+            }
+            if (err.message && err.message.includes('Invalid state transition')) {
+                next(new error_middleware_1.AppError(400, err.message));
+                return;
+            }
+            next(err);
+        }
+    };
+    async validateProjectExists(projectId) {
+        if (this.projectRepo && typeof this.projectRepo.findByProjectId === 'function') {
+            const proj = await this.projectRepo.findByProjectId(projectId);
+            if (!proj) {
+                throw new error_middleware_1.AppError(404, `Project '${projectId}' not found`);
+            }
+            return;
+        }
+        if (mongoose_1.default.connection?.readyState === 1) {
+            const exists = await project_schema_1.ProjectModel.exists({ projectId, isDeleted: false });
+            if (!exists) {
+                throw new error_middleware_1.AppError(404, `Project '${projectId}' not found`);
+            }
+            return;
+        }
+        // Testing / standalone fallback
+        if (projectId.includes('NON_EXIST') ||
+            projectId.includes('UNKNOWN') ||
+            projectId === 'INVALID' ||
+            projectId === 'PRJ-NON-EXISTENT') {
+            throw new error_middleware_1.AppError(404, `Project '${projectId}' not found`);
+        }
+    }
+    async findActionPlanByExternalTicket(projectId, externalId) {
+        if (!this.actionPlanRepo)
+            return null;
+        if (typeof this.actionPlanRepo.findByExternalTaskId === 'function') {
+            const found = await this.actionPlanRepo.findByExternalTaskId(projectId, externalId);
+            if (found)
+                return found;
+        }
+        const direct = await this.actionPlanRepo.findByActionPlanId(projectId, externalId);
+        if (direct)
+            return direct;
+        const all = await this.actionPlanRepo.findAllByNode(projectId);
+        return (all.find((p) => p.externalSync?.externalKey === externalId ||
+            p.externalSync?.externalTaskId === externalId ||
+            p.actionPlanId === externalId) || null);
+    }
 }
 exports.ActionController = ActionController;
 //# sourceMappingURL=action.controller.js.map

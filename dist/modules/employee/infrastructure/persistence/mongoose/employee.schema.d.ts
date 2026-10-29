@@ -5,6 +5,7 @@ export interface IEmployeeDocument extends Document {
     nodeId: string;
     matrixNodeIds: string[];
     email?: string;
+    emailBlindIndex?: string;
     fullName: string;
     phoneNumber?: string;
     status: 'ACTIVE' | 'ON_LEAVE' | 'SUSPENDED' | 'TERMINATED';

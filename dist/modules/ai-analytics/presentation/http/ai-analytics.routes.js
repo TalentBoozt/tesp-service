@@ -13,12 +13,14 @@ const knowledge_engine_use_case_1 = require("../../application/use-cases/knowled
 const ai_analytics_controller_1 = require("./ai-analytics.controller");
 const auth_middleware_1 = require("../../../../shared/presentation/middleware/auth.middleware");
 const openai_gemini_adapter_1 = require("../../application/adapters/openai-gemini.adapter");
-function createAiAnalyticsRouter(aiInsightRepo, responseRepo, aiProvider) {
+const project_repository_1 = require("../../../project-config/infrastructure/persistence/mongoose/project.repository");
+function createAiAnalyticsRouter(aiInsightRepo, responseRepo, aiProvider, projectConfigRepo) {
     const router = (0, express_1.Router)();
     const aiRepo = aiInsightRepo || new ai_insight_repository_1.AiInsightMongoRepository();
     const resRepo = responseRepo || new survey_response_repository_1.SurveyResponseMongoRepository();
     const provider = aiProvider || new openai_gemini_adapter_1.OpenAiGeminiAdapter();
-    const analyzeTextResponsesUseCase = new analyze_text_responses_use_case_1.AnalyzeTextResponsesUseCase(aiRepo, resRepo, provider);
+    const projRepo = projectConfigRepo || (aiInsightRepo ? undefined : new project_repository_1.ProjectMongoRepository());
+    const analyzeTextResponsesUseCase = new analyze_text_responses_use_case_1.AnalyzeTextResponsesUseCase(aiRepo, resRepo, provider, undefined, projRepo);
     const getExecutiveSummaryUseCase = new get_executive_summary_use_case_1.GetExecutiveSummaryUseCase(aiRepo, provider, resRepo);
     const overrideSentimentUseCase = new override_sentiment_use_case_1.OverrideSentimentUseCase(aiRepo);
     const getRiskAlertsUseCase = new get_risk_alerts_use_case_1.GetRiskAlertsUseCase(aiRepo);

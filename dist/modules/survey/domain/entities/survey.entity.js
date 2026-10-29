@@ -2,7 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.SurveyEntity = void 0;
 class SurveyEntity {
-    static SURVEY_ID_REGEX = /^SRV-[A-Za-z0-9_-]{3,20}$/;
+    static SURVEY_ID_REGEX = /^SRV-[A-Za-z0-9_-]{3,50}$/;
     projectId;
     surveyId;
     _version;
@@ -20,7 +20,7 @@ class SurveyEntity {
             throw new Error('projectId is required');
         }
         if (!props.surveyId || !SurveyEntity.SURVEY_ID_REGEX.test(props.surveyId)) {
-            throw new Error(`Invalid Survey ID format '${props.surveyId}'. Expected format: ^SRV-[A-Za-z0-9_-]{3,20}$ (e.g. SRV-5001).`);
+            throw new Error(`Invalid Survey ID format '${props.surveyId}'. Expected format: ^SRV-[A-Za-z0-9_-]{3,50}$ (e.g. SRV-5001).`);
         }
         if (!props.title || Object.keys(props.title).length === 0) {
             throw new Error('Survey title is required and must contain at least one locale string (VR-SRV-004).');

@@ -29,6 +29,8 @@ const AiInsightSchema = new mongoose_1.Schema({
         overriddenAt: { type: Date },
     },
     processedAt: { type: Date, required: true },
+    isAiSimulated: { type: Boolean, default: false },
+    fallbackReason: { type: String },
 }, {
     timestamps: false,
     collection: 'ai_insights',

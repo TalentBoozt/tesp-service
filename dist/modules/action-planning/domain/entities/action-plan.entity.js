@@ -40,7 +40,7 @@ class ActionPlanEntity {
         this.targetScore = props.targetScore;
         this.postActionScore = props.postActionScore;
         this.targetCompletionDate = props.targetCompletionDate;
-        this.milestones = props.milestones ? [...props.milestones] : [];
+        this.milestones = props.milestones ? props.milestones.map((m) => ({ alertState: 'NONE', ...m })) : [];
         this.externalSync = props.externalSync ? { ...props.externalSync } : { system: 'NONE' };
         this.isDeleted = props.isDeleted ?? false;
         this.createdAt = props.createdAt || new Date();

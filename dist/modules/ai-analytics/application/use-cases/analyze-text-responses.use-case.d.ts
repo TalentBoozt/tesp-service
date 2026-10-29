@@ -6,12 +6,16 @@ export interface AnalyzeResult {
     processedCount: number;
     criticalRiskCount: number;
 }
+import { IEventBus } from '../../../../shared/domain/events/event-bus';
+import { IProjectRepository } from '../../../project-config/domain/repositories/project.repository.interface';
 export declare class AnalyzeTextResponsesUseCase {
     private aiInsightRepo;
     private responseRepo;
     private aiProvider;
+    private eventBus;
+    private projectConfigRepo?;
     private piiSanitizer;
     private riskScanner;
-    constructor(aiInsightRepo: IAiInsightRepository, responseRepo: ISurveyResponseRepository, aiProvider?: IAiProviderAdapter);
+    constructor(aiInsightRepo: IAiInsightRepository, responseRepo: ISurveyResponseRepository, aiProvider?: IAiProviderAdapter, eventBus?: IEventBus, projectConfigRepo?: IProjectRepository | undefined);
     execute(projectId: string, campaignId: string): Promise<AnalyzeResult>;
 }

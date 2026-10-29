@@ -8,6 +8,7 @@ export interface GeneratePptOptions {
     scopeType: ReportScopeType;
     scopeFilter?: IReportScopeFilter;
     requestedBy?: string;
+    bypassPrivacy?: boolean;
 }
 export interface GeneratedPptResult {
     filePath: string;
@@ -18,6 +19,6 @@ export interface GeneratedPptResult {
 }
 export declare class PptReportGenerator {
     private aggregator;
+    private storageService;
     generatePpt(options: GeneratePptOptions): Promise<GeneratedPptResult>;
-    private buildBoardroomSlideDeck;
 }

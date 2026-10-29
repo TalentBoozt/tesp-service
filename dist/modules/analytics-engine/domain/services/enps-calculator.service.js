@@ -5,7 +5,7 @@ class EnpsCalculatorService {
     calculateEnps(scores) {
         if (!scores || scores.length === 0) {
             return {
-                eNPS: 0,
+                eNPS: null,
                 totalResponses: 0,
                 promoters: 0,
                 passives: 0,

@@ -39,13 +39,18 @@ class MoveOrgNodeUseCase {
             // No movement required
             return targetNode;
         }
-        // 2. Update target node
-        targetNode.setPathAndParent(newParentId, newParentNode ? newParentNode.path : undefined);
-        const savedNode = await this.repository.save(targetNode);
-        // 3. Bulk update all descendant child node paths
-        await this.repository.bulkUpdateSubTreePaths(projectId, oldPath, newPath);
+        // 2. Update target node and descendants atomically (GAP-018)
+        let savedNode;
+        if (typeof this.repository.moveNode === 'function') {
+            savedNode = await this.repository.moveNode(projectId, nodeId, newParentId, oldPath, newPath);
+        }
+        else {
+            targetNode.setPathAndParent(newParentId, newParentNode ? newParentNode.path : undefined);
+            savedNode = await this.repository.save(targetNode);
+            await this.repository.bulkUpdateSubTreePaths(projectId, oldPath, newPath);
+        }
         // 4. Domain Event
-        this.eventBus.publish(new org_node_events_1.OrgNodeMovedEvent(nodeId, {
+        await this.eventBus.publish(new org_node_events_1.OrgNodeMovedEvent(nodeId, {
             projectId,
             nodeId,
             oldPath,

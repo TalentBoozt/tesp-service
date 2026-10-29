@@ -12,6 +12,7 @@ export declare class ConsultantController {
     getBenchmarks: (req: Request, res: Response, next: NextFunction) => Promise<void>;
     getWorkshops: (req: Request, res: Response, next: NextFunction) => Promise<void>;
     createWorkshop: (req: Request, res: Response, next: NextFunction) => Promise<void>;
+    getWorkspace: (req: Request, res: Response, next: NextFunction) => Promise<void>;
     getSignoffQueue: (req: Request, res: Response, next: NextFunction) => Promise<void>;
     signoffAiFinding: (req: Request, res: Response, next: NextFunction) => Promise<void>;
 }

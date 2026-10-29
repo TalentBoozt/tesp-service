@@ -15,4 +15,5 @@ export declare class ValidateAndBurnTokenUseCase {
     private resolveAlternativeTokens;
     validateToken(token: string): Promise<TokenValidationResult>;
     burnToken(token: string): Promise<TokenValidationResult>;
+    restoreToken(token: string, payload?: CachedTokenPayload, ttlSeconds?: number): Promise<void>;
 }

@@ -1,4 +1,4 @@
-import { ISurveyResponseRepository } from '../../../domain/repositories/survey-response.repository.interface';
+import { ISurveyResponseRepository, DashboardAggregationResult, HeatmapAggregationResult } from '../../../domain/repositories/survey-response.repository.interface';
 import { SurveyResponseEntity } from '../../../domain/entities/survey-response.entity';
 export declare class SurveyResponseMongoRepository implements ISurveyResponseRepository {
     private toEntity;
@@ -11,4 +11,10 @@ export declare class SurveyResponseMongoRepository implements ISurveyResponseRep
         responses: SurveyResponseEntity[];
         total: number;
     }>;
+    aggregateDashboardStats(projectId: string, campaignId: string, filter?: {
+        nodeId?: string;
+        demographicFilters?: Record<string, string>;
+    }): Promise<DashboardAggregationResult>;
+    aggregateHeatmapByDepartment(projectId: string, campaignId: string): Promise<HeatmapAggregationResult[]>;
+    findSubmissionTimestamps(projectId: string, nodeId?: string): Promise<Date[]>;
 }

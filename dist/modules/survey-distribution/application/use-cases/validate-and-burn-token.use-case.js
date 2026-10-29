@@ -114,6 +114,19 @@ class ValidateAndBurnTokenUseCase {
             payload: valResult.payload,
         };
     }
+    async restoreToken(token, payload, ttlSeconds = 86400) {
+        const candidates = this.resolveAlternativeTokens(token);
+        if (payload) {
+            for (const cand of candidates) {
+                await this.redisRepo.cacheToken(cand, payload, ttlSeconds);
+            }
+        }
+        if (this.vaultRepo?.restoreToken) {
+            for (const cand of candidates) {
+                await this.vaultRepo.restoreToken(cand);
+            }
+        }
+    }
 }
 exports.ValidateAndBurnTokenUseCase = ValidateAndBurnTokenUseCase;
 //# sourceMappingURL=validate-and-burn-token.use-case.js.map

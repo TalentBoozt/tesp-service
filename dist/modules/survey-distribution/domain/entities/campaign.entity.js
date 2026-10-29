@@ -119,6 +119,13 @@ class CampaignEntity {
         this.status = CampaignStatus.CANCELLED;
         this.updatedAt = new Date();
     }
+    forceComplete() {
+        if (this.status === CampaignStatus.ARCHIVED) {
+            throw new Error(`Cannot complete campaign in state '${this.status}'`);
+        }
+        this.status = CampaignStatus.COMPLETED;
+        this.updatedAt = new Date();
+    }
     checkExpiration(now = new Date()) {
         if (this.status === CampaignStatus.ACTIVE && now.getTime() >= this.expirationDate.getTime()) {
             this.status = CampaignStatus.EXPIRED;

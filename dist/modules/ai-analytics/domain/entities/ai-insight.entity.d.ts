@@ -28,6 +28,8 @@ export interface AiInsightProps {
     riskFlags?: RiskFlag[];
     humanOverride?: HumanOverride;
     processedAt?: Date;
+    isAiSimulated?: boolean;
+    fallbackReason?: string;
 }
 export declare class AiInsightEntity {
     readonly projectId: string;
@@ -44,6 +46,8 @@ export declare class AiInsightEntity {
     readonly riskFlags: RiskFlag[];
     readonly humanOverride?: HumanOverride;
     readonly processedAt: Date;
+    readonly isAiSimulated?: boolean;
+    readonly fallbackReason?: string;
     constructor(props: AiInsightProps);
     private validateInsightId;
     private validateScores;

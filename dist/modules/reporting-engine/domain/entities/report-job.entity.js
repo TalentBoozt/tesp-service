@@ -47,6 +47,12 @@ class ReportJobEntity {
         this.fileSizeBytes = fileSizeBytes;
         this.completedAt = new Date();
     }
+    get failureReason() {
+        return this.errorMessage;
+    }
+    set failureReason(val) {
+        this.errorMessage = val;
+    }
     failJob(errorMessage) {
         this.status = 'FAILED';
         this.errorMessage = errorMessage;
@@ -64,6 +70,7 @@ class ReportJobEntity {
             downloadUrl: this.downloadUrl,
             expiresAt: this.expiresAt,
             errorMessage: this.errorMessage,
+            failureReason: this.errorMessage,
             fileSizeBytes: this.fileSizeBytes,
             createdAt: this.createdAt,
             completedAt: this.completedAt,

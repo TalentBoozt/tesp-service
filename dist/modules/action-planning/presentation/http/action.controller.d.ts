@@ -7,6 +7,7 @@ import { ListActionPlansUseCase } from '../../application/use-cases/list-action-
 import { GetActionPlanUseCase } from '../../application/use-cases/get-action-plan.use-case';
 import { UpdateActionPlanUseCase } from '../../application/use-cases/update-action-plan.use-case';
 import { DeleteActionPlanUseCase } from '../../application/use-cases/delete-action-plan.use-case';
+import { IActionPlanRepository } from '../../domain/repositories/action-plan.repository.interface';
 export declare class ActionController {
     private createActionPlanUseCase;
     private transitionActionPlanStatusUseCase;
@@ -16,7 +17,9 @@ export declare class ActionController {
     private getActionPlanUseCase?;
     private updateActionPlanUseCase?;
     private deleteActionPlanUseCase?;
-    constructor(createActionPlanUseCase: CreateActionPlanUseCase, transitionActionPlanStatusUseCase: TransitionActionPlanStatusUseCase, getRecommendedTemplatesUseCase: GetRecommendedTemplatesUseCase, syncExternalTaskUseCase: SyncExternalTaskUseCase, listActionPlansUseCase: ListActionPlansUseCase, getActionPlanUseCase?: GetActionPlanUseCase | undefined, updateActionPlanUseCase?: UpdateActionPlanUseCase | undefined, deleteActionPlanUseCase?: DeleteActionPlanUseCase | undefined);
+    private actionPlanRepo?;
+    private projectRepo?;
+    constructor(createActionPlanUseCase: CreateActionPlanUseCase, transitionActionPlanStatusUseCase: TransitionActionPlanStatusUseCase, getRecommendedTemplatesUseCase: GetRecommendedTemplatesUseCase, syncExternalTaskUseCase: SyncExternalTaskUseCase, listActionPlansUseCase: ListActionPlansUseCase, getActionPlanUseCase?: GetActionPlanUseCase | undefined, updateActionPlanUseCase?: UpdateActionPlanUseCase | undefined, deleteActionPlanUseCase?: DeleteActionPlanUseCase | undefined, actionPlanRepo?: IActionPlanRepository | undefined, projectRepo?: any | undefined);
     createActionPlan: (req: Request, res: Response, next: NextFunction) => Promise<void>;
     getActionPlan: (req: Request, res: Response, next: NextFunction) => Promise<void>;
     updateActionPlan: (req: Request, res: Response, next: NextFunction) => Promise<void>;
@@ -26,4 +29,8 @@ export declare class ActionController {
     getTemplates: (req: Request, res: Response, next: NextFunction) => Promise<void>;
     syncTask: (req: Request, res: Response, next: NextFunction) => Promise<void>;
     getKanban: (req: Request, res: Response, next: NextFunction) => Promise<void>;
+    handleJiraWebhook: (req: Request, res: Response, next: NextFunction) => Promise<void>;
+    handlePlannerWebhook: (req: Request, res: Response, next: NextFunction) => Promise<void>;
+    private validateProjectExists;
+    private findActionPlanByExternalTicket;
 }

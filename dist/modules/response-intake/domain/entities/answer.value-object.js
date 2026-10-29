@@ -4,6 +4,8 @@ exports.AnswerValueObject = void 0;
 class AnswerValueObject {
     questionId;
     questionType;
+    groupId;
+    category;
     numericValue;
     textValue;
     selectedOptions;
@@ -16,6 +18,8 @@ class AnswerValueObject {
         }
         this.questionId = props.questionId;
         this.questionType = props.questionType;
+        this.groupId = props.groupId;
+        this.category = props.category;
         this.numericValue = props.numericValue;
         this.textValue = props.textValue;
         this.selectedOptions = props.selectedOptions ? [...props.selectedOptions] : undefined;
@@ -24,6 +28,8 @@ class AnswerValueObject {
         return {
             questionId: this.questionId,
             questionType: this.questionType,
+            groupId: this.groupId,
+            category: this.category,
             numericValue: this.numericValue,
             textValue: this.textValue,
             selectedOptions: this.selectedOptions ? [...this.selectedOptions] : undefined,

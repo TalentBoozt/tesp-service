@@ -21,11 +21,14 @@ export interface IActionPlanDocument extends Document {
         status: MilestoneStatus;
         dueDate: Date;
         completed?: boolean;
+        alertState?: 'NONE' | 'NUDGE_SENT' | 'OVERDUE_ESCALATED';
     }[];
     externalSync?: {
         system: 'NONE' | 'JIRA' | 'MS_PLANNER';
         externalKey?: string;
         externalTaskId?: string;
+        externalUrl?: string;
+        status?: 'SYNCED' | 'PENDING_CONFIG';
         lastSyncedAt?: Date;
     };
     isDeleted: boolean;

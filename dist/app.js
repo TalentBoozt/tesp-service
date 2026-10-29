@@ -47,7 +47,11 @@ function createApp() {
             if (allowedOrigins.includes(origin) || allowedOrigins.includes('*')) {
                 return callback(null, true);
             }
-            return callback(null, true);
+            if (process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test') {
+                return callback(null, true);
+            }
+            // In production, reject untrusted origins
+            return callback(null, false);
         },
         credentials: true,
         methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],

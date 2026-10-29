@@ -12,4 +12,5 @@ export interface IOrgNodeRepository {
     hasActiveChildren(projectId: string, nodeId: string): Promise<boolean>;
     bulkUpdateSubTreePaths(projectId: string, oldPrefix: string, newPrefix: string): Promise<number>;
     softDelete(projectId: string, nodeId: string): Promise<boolean>;
+    moveNode?(projectId: string, nodeId: string, newParentId: string | null, oldPath: string, newPath: string): Promise<OrgNodeEntity>;
 }

@@ -27,6 +27,7 @@ export declare class EmployeeController {
     listEmployees: (req: Request, res: Response, next: NextFunction) => Promise<void>;
     terminateEmployee: (req: Request, res: Response, next: NextFunction) => Promise<void>;
     getSurveyHistory: (req: Request, res: Response, next: NextFunction) => Promise<void>;
+    getMySurveys: (req: Request, res: Response, next: NextFunction) => Promise<void>;
     getHrisConfig: (req: Request, res: Response, next: NextFunction) => Promise<void>;
     updateHrisConfig: (req: Request, res: Response, next: NextFunction) => Promise<void>;
     syncHris: (req: Request, res: Response, next: NextFunction) => Promise<void>;

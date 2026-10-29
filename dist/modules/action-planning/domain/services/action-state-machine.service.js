@@ -4,13 +4,14 @@ exports.ActionStateMachineService = void 0;
 const auth_middleware_1 = require("../../../../shared/presentation/middleware/auth.middleware");
 class ActionStateMachineService {
     allowedTransitions = new Map([
-        ['DRAFT', ['PROPOSED', 'IN_PROGRESS', 'CANCELLED']],
-        ['PROPOSED', ['APPROVED', 'REJECTED', 'IN_PROGRESS', 'CANCELLED']],
+        ['DRAFT', ['PROPOSED', 'IN_PROGRESS', 'ACTIVE', 'CANCELLED']],
+        ['PROPOSED', ['APPROVED', 'REJECTED', 'IN_PROGRESS', 'ACTIVE', 'CANCELLED']],
         ['REJECTED', ['DRAFT', 'PROPOSED', 'CANCELLED']],
-        ['APPROVED', ['IN_PROGRESS', 'CANCELLED']],
-        ['IN_PROGRESS', ['COMPLETED', 'CANCELLED', 'DRAFT']],
-        ['COMPLETED', ['VERIFIED', 'IN_PROGRESS', 'CANCELLED']],
-        ['VERIFIED', ['COMPLETED', 'IN_PROGRESS']],
+        ['APPROVED', ['IN_PROGRESS', 'ACTIVE', 'CANCELLED']],
+        ['IN_PROGRESS', ['COMPLETED', 'ACTIVE', 'CANCELLED', 'DRAFT']],
+        ['ACTIVE', ['COMPLETED', 'IN_PROGRESS', 'CANCELLED', 'DRAFT']],
+        ['COMPLETED', ['VERIFIED', 'IN_PROGRESS', 'ACTIVE', 'CANCELLED']],
+        ['VERIFIED', ['COMPLETED', 'IN_PROGRESS', 'ACTIVE']],
         ['CANCELLED', ['DRAFT']],
     ]);
     canTransition(current, target, userRole) {

@@ -4,7 +4,7 @@ import { UserRole } from '../../../../shared/presentation/middleware/auth.middle
 export interface ISeedUserConfig {
     userId: string;
     email: string;
-    plainPassword: string;
+    plainPassword?: string;
     firstName: string;
     lastName: string;
     role: UserRole;
@@ -13,6 +13,7 @@ export interface ISeedUserConfig {
     primaryProjectId: string;
     mustChangePassword?: boolean;
 }
+export declare function getInitialSuperAdminPassword(): string;
 export declare const DEFAULT_PRODUCTION_SEED_USERS: ISeedUserConfig[];
 export declare class AuthSeederService {
     private readonly userRepository;

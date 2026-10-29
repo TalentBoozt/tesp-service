@@ -6,21 +6,61 @@ const analytical_snapshot_created_event_1 = require("../../domain/events/analyti
 const enps_calculator_service_1 = require("../../domain/services/enps-calculator.service");
 const engagement_index_calculator_1 = require("../../domain/services/engagement-index.calculator");
 const privacy_guard_service_1 = require("../../domain/services/privacy-guard.service");
+const event_bus_1 = require("../../../../shared/domain/events/event-bus");
 class FreezeAnalyticalSnapshotUseCase {
     snapshotRepo;
     responseRepo;
     enpsCalculator;
     engagementCalculator;
     privacyGuard;
-    constructor(snapshotRepo, responseRepo) {
+    surveyRepo;
+    eventBus;
+    constructor(snapshotRepo, responseRepo, surveyRepoOrEventBus, eventBusOrSurveyRepo) {
         this.snapshotRepo = snapshotRepo;
         this.responseRepo = responseRepo;
+        if (surveyRepoOrEventBus &&
+            'publish' in surveyRepoOrEventBus &&
+            typeof surveyRepoOrEventBus.publish === 'function') {
+            this.eventBus = surveyRepoOrEventBus;
+            this.surveyRepo = eventBusOrSurveyRepo;
+        }
+        else {
+            this.surveyRepo = surveyRepoOrEventBus;
+            this.eventBus = eventBusOrSurveyRepo || event_bus_1.DomainEventBus.getInstance();
+        }
         this.enpsCalculator = new enps_calculator_service_1.EnpsCalculatorService();
         this.engagementCalculator = new engagement_index_calculator_1.EngagementIndexCalculatorService();
         this.privacyGuard = new privacy_guard_service_1.PrivacyGuardService();
     }
     async execute(projectId, campaignId, surveyId) {
         const { responses } = await this.responseRepo.findAllByCampaign(projectId, campaignId, { limit: 100000 });
+        // Build question group mapping from survey definition (GAP-011 / TASK-04-02)
+        const questionGroupMap = new Map();
+        if (this.surveyRepo) {
+            try {
+                const survey = await this.surveyRepo.findBySurveyId(projectId, surveyId);
+                if (survey && survey.pages) {
+                    for (const page of survey.pages) {
+                        if (page.sections) {
+                            for (const section of page.sections) {
+                                if (section.questions) {
+                                    for (const q of section.questions) {
+                                        const qId = q.questionId || q.id;
+                                        const assignedGroup = q.groupId || section.sectionId;
+                                        if (qId && assignedGroup) {
+                                            questionGroupMap.set(qId, assignedGroup);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            catch (err) {
+                console.warn(`[FreezeAnalyticalSnapshotUseCase] Unable to resolve question groups for survey ${surveyId}:`, err);
+            }
+        }
         const npsScores = [];
         const likertScores = [];
         const groupAnswers = [];
@@ -37,12 +77,13 @@ class FreezeAnalyticalSnapshotUseCase {
                         npsScores.push(ans.numericValue);
                     if (ans.questionType === 'LIKERT') {
                         likertScores.push(ans.numericValue);
-                        groupAnswers.push({ groupId: ans.questionId.split('-')[0] || 'GRP-GENERAL', numericValue: ans.numericValue });
+                        const groupId = questionGroupMap.get(ans.questionId) || 'GRP-GENERAL';
+                        groupAnswers.push({ groupId, numericValue: ans.numericValue });
                     }
                 }
             }
         }
-        const overallEnps = this.enpsCalculator.calculateEnps(npsScores).eNPS;
+        const overallEnps = this.enpsCalculator.calculateEnps(npsScores).eNPS ?? 0;
         const overallEngagementIndex = this.engagementCalculator.calculateIndex(likertScores);
         const groupScores = this.engagementCalculator.calculateGroupScores(groupAnswers);
         const nodeAggregates = [];
@@ -73,7 +114,7 @@ class FreezeAnalyticalSnapshotUseCase {
         });
         const saved = await this.snapshotRepo.save(snapshot);
         // Emit event (FR-ANL-007)
-        new analytical_snapshot_created_event_1.AnalyticalSnapshotCreatedEvent({
+        const event = new analytical_snapshot_created_event_1.AnalyticalSnapshotCreatedEvent({
             projectId,
             campaignId,
             surveyId,
@@ -82,6 +123,7 @@ class FreezeAnalyticalSnapshotUseCase {
             overallEnps,
             overallEngagementIndex,
         });
+        await this.eventBus.publish(event);
         return saved;
     }
 }

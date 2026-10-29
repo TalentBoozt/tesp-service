@@ -4,6 +4,7 @@ exports.RedisService = void 0;
 const config_1 = require("../../../config");
 class InMemoryCacheClient {
     store = new Map();
+    lists = new Map();
     async get(key) {
         const item = this.store.get(key);
         if (!item)
@@ -20,34 +21,59 @@ class InMemoryCacheClient {
         return 'OK';
     }
     async del(key) {
-        const existed = this.store.has(key);
-        this.store.delete(key);
-        return existed ? 1 : 0;
+        let count = 0;
+        if (this.store.delete(key))
+            count = 1;
+        if (this.lists.delete(key))
+            count = 1;
+        return count;
     }
     async flushall() {
         this.store.clear();
+        this.lists.clear();
         return 'OK';
     }
     async close() {
         this.store.clear();
+        this.lists.clear();
+    }
+    async rpush(key, value) {
+        const list = this.lists.get(key) || [];
+        list.push(value);
+        this.lists.set(key, list);
+        return list.length;
+    }
+    async lpop(key) {
+        const list = this.lists.get(key) || [];
+        const item = list.shift() || null;
+        return item;
+    }
+    async llen(key) {
+        const list = this.lists.get(key) || [];
+        return list.length;
     }
 }
 class UpstashRestCacheClient {
-    url;
-    token;
     fallback = new Map();
+    listFallback = new Map();
+    cleanUrl;
+    cleanToken;
     constructor(url, token) {
-        this.url = url;
-        this.token = token;
+        this.cleanUrl = (url || '').replace(/["']/g, '').trim();
+        this.cleanToken = (token || '').replace(/["']/g, '').trim();
     }
     async command(cmd) {
-        const response = await fetch(this.url, {
+        if (!this.cleanUrl || !this.cleanUrl.startsWith('http')) {
+            throw new Error('Invalid Upstash Redis REST URL');
+        }
+        const response = await fetch(this.cleanUrl, {
             method: 'POST',
             headers: {
-                Authorization: `Bearer ${this.token}`,
+                Authorization: `Bearer ${this.cleanToken}`,
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify(cmd),
+            signal: AbortSignal.timeout(3000),
         });
         const data = (await response.json());
         return data.result;
@@ -95,12 +121,16 @@ class UpstashRestCacheClient {
         try {
             const res = await this.command(['DEL', key]);
             this.fallback.delete(key);
+            this.listFallback.delete(key);
             return typeof res === 'number' ? res : 1;
         }
         catch {
-            const existed = this.fallback.has(key);
-            this.fallback.delete(key);
-            return existed ? 1 : 0;
+            let count = 0;
+            if (this.fallback.delete(key))
+                count = 1;
+            if (this.listFallback.delete(key))
+                count = 1;
+            return count;
         }
     }
     async flushall() {
@@ -109,10 +139,44 @@ class UpstashRestCacheClient {
         }
         catch { }
         this.fallback.clear();
+        this.listFallback.clear();
         return 'OK';
     }
     async close() {
         this.fallback.clear();
+        this.listFallback.clear();
+    }
+    async rpush(key, value) {
+        try {
+            const res = await this.command(['RPUSH', key, value]);
+            return typeof res === 'number' ? res : 1;
+        }
+        catch {
+            const list = this.listFallback.get(key) || [];
+            list.push(value);
+            this.listFallback.set(key, list);
+            return list.length;
+        }
+    }
+    async lpop(key) {
+        try {
+            const res = await this.command(['LPOP', key]);
+            return res !== null && res !== undefined ? String(res) : null;
+        }
+        catch {
+            const list = this.listFallback.get(key) || [];
+            return list.shift() || null;
+        }
+    }
+    async llen(key) {
+        try {
+            const res = await this.command(['LLEN', key]);
+            return typeof res === 'number' ? res : 0;
+        }
+        catch {
+            const list = this.listFallback.get(key) || [];
+            return list.length;
+        }
     }
 }
 class RedisService {
@@ -125,9 +189,11 @@ class RedisService {
             this.client = new InMemoryCacheClient();
             return this.client;
         }
-        // App uses only Upstash Redis REST API
-        if (config_1.config.upstashRedisRestUrl && config_1.config.upstashRedisRestToken) {
-            this.client = new UpstashRestCacheClient(config_1.config.upstashRedisRestUrl, config_1.config.upstashRedisRestToken);
+        // App uses exclusively Upstash Redis REST API
+        const restUrl = config_1.config.upstashRedisRestUrl || process.env.UPSTASH_REDIS_REST_URL;
+        const restToken = config_1.config.upstashRedisRestToken || process.env.UPSTASH_REDIS_REST_TOKEN;
+        if (restUrl && restToken) {
+            this.client = new UpstashRestCacheClient(restUrl, restToken);
             return this.client;
         }
         this.client = new InMemoryCacheClient();
@@ -136,6 +202,10 @@ class RedisService {
     static useInMemoryFallback() {
         this.useMemory = true;
         this.client = new InMemoryCacheClient();
+    }
+    static resetClient() {
+        this.client = null;
+        this.useMemory = false;
     }
 }
 exports.RedisService = RedisService;
