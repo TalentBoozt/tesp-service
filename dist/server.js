@@ -16,6 +16,7 @@ const report_job_repository_1 = require("./modules/reporting-engine/infrastructu
 const report_job_queue_1 = require("./modules/reporting-engine/infrastructure/queue/report-job.queue");
 const reminder_scheduler_1 = require("./modules/survey-distribution/infrastructure/jobs/reminder-scheduler");
 const milestone_escalation_worker_1 = require("./modules/action-planning/application/services/milestone-escalation-worker");
+const notification_distribution_engine_1 = require("./modules/notification/infrastructure/services/notification-distribution-engine");
 let server = null;
 let reportQueueTimer = null;
 let reminderSchedulerInstance = null;
@@ -72,6 +73,9 @@ async function bootstrap() {
         // 7. Initialize action planning milestone escalation worker (GAP-009 / TASK-011)
         milestoneEscalationWorkerInstance = milestone_escalation_worker_1.MilestoneEscalationWorker.getInstance();
         milestoneEscalationWorkerInstance.start();
+        // 7.1 Initialize real-time notification distribution engine
+        notification_distribution_engine_1.NotificationDistributionEngine.getInstance().start();
+        console.log('[TESP Monolith] Notification distribution engine active');
         // 8. Start HTTP Server listener
         const app = (0, app_1.createApp)();
         server = app.listen(config_1.config.port, () => {

@@ -2,6 +2,7 @@ import { Document } from 'mongoose';
 import { EngagementStage, EngagementHealth, WorkshopStatus, RiskSeverity } from '../../../domain/entities/consultant.entities';
 export interface IClientEngagementDocument extends Document {
     id: string;
+    firmId?: string;
     projectId: string;
     clientName: string;
     clientCode: string;
@@ -24,6 +25,7 @@ export declare const ClientEngagementModel: import("mongoose").Model<IClientEnga
 }, any>;
 export interface IIndustryBenchmarkDocument extends Document {
     id: string;
+    firmId: string;
     metricKey: string;
     metricName: string;
     sector: string;
@@ -40,6 +42,7 @@ export declare const IndustryBenchmarkModel: import("mongoose").Model<IIndustryB
 }, any>;
 export interface IExecutiveWorkshopDocument extends Document {
     id: string;
+    firmId?: string;
     projectId: string;
     title: string;
     clientName: string;
@@ -59,6 +62,7 @@ export declare const ExecutiveWorkshopModel: import("mongoose").Model<IExecutive
 }, any>;
 export interface IAiSignoffDocument extends Document {
     id: string;
+    firmId?: string;
     projectId: string;
     surveyTitle: string;
     aiGeneratedInsight: string;

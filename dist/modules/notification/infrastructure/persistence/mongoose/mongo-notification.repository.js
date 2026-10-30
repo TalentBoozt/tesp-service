@@ -103,14 +103,26 @@ class MongoNotificationRepository {
                 // SUPER_ADMIN has access to all notifications in the project
                 return {};
             }
-            conditions.push({ recipientRole });
+            if (recipientRole === auth_middleware_1.UserRole.CONSULTANT || recipientRole === auth_middleware_1.UserRole.CONSULTANT_DAASH) {
+                conditions.push({ recipientRole: { $in: [auth_middleware_1.UserRole.CONSULTANT, auth_middleware_1.UserRole.CONSULTANT_DAASH] } });
+            }
+            else {
+                conditions.push({ recipientRole });
+            }
         }
         return { $or: conditions };
     }
+    isGlobalScope(projectId) {
+        if (!projectId)
+            return false;
+        const normalized = projectId.trim().toUpperCase();
+        return normalized === 'GLOBAL' || normalized === 'ALL' || normalized === '*';
+    }
     async findTenantNotifications(query) {
-        const filter = {
-            projectId: query.projectId.trim().toUpperCase(),
-        };
+        const filter = {};
+        if (!this.isGlobalScope(query.projectId)) {
+            filter.projectId = query.projectId.trim().toUpperCase();
+        }
         if (query.isRead !== undefined) {
             filter.isRead = query.isRead;
         }
@@ -140,9 +152,11 @@ class MongoNotificationRepository {
     }
     async countUnread(projectId, recipientUserId, recipientRole) {
         const filter = {
-            projectId: projectId.trim().toUpperCase(),
             isRead: false,
         };
+        if (!this.isGlobalScope(projectId)) {
+            filter.projectId = projectId.trim().toUpperCase();
+        }
         const recipientFilter = this.buildRecipientFilter(recipientUserId, recipientRole);
         if (Object.keys(recipientFilter).length > 0) {
             filter.$and = [recipientFilter];
@@ -150,14 +164,20 @@ class MongoNotificationRepository {
         return notification_schema_1.NotificationModel.countDocuments(filter);
     }
     async markAsRead(notificationId, projectId) {
-        const res = await notification_schema_1.NotificationModel.updateOne({ notificationId, projectId: projectId.trim().toUpperCase() }, { $set: { isRead: true, readAt: new Date() } });
+        const filter = { notificationId };
+        if (!this.isGlobalScope(projectId)) {
+            filter.projectId = projectId.trim().toUpperCase();
+        }
+        const res = await notification_schema_1.NotificationModel.updateOne(filter, { $set: { isRead: true, readAt: new Date() } });
         return res.modifiedCount > 0;
     }
     async markAllAsRead(projectId, recipientUserId, recipientRole) {
         const filter = {
-            projectId: projectId.trim().toUpperCase(),
             isRead: false,
         };
+        if (!this.isGlobalScope(projectId)) {
+            filter.projectId = projectId.trim().toUpperCase();
+        }
         const recipientFilter = this.buildRecipientFilter(recipientUserId, recipientRole);
         if (Object.keys(recipientFilter).length > 0) {
             filter.$and = [recipientFilter];
@@ -168,10 +188,11 @@ class MongoNotificationRepository {
         return res.modifiedCount;
     }
     async delete(notificationId, projectId) {
-        const res = await notification_schema_1.NotificationModel.deleteOne({
-            notificationId,
-            projectId: projectId.trim().toUpperCase(),
-        });
+        const filter = { notificationId };
+        if (!this.isGlobalScope(projectId)) {
+            filter.projectId = projectId.trim().toUpperCase();
+        }
+        const res = await notification_schema_1.NotificationModel.deleteOne(filter);
         return res.deletedCount > 0;
     }
 }

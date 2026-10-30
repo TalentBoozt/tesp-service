@@ -21,7 +21,7 @@ function createConsultantTenantGuard(firmRepo = new mongo_consulting_firm_reposi
             return next();
         }
         // Only apply consulting firm portfolio guard to CONSULTANT roles
-        if (effectiveRole !== auth_middleware_1.UserRole.CONSULTANT_DAASH) {
+        if (effectiveRole !== auth_middleware_1.UserRole.CONSULTANT && effectiveRole !== auth_middleware_1.UserRole.CONSULTANT_DAASH) {
             return next();
         }
         const targetProjectId = req.params.projectId ||

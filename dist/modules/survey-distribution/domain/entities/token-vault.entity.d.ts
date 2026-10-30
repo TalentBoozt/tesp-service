@@ -6,6 +6,7 @@ export interface TokenVaultProps {
     channel?: string;
     employeeId?: string;
     nodeId?: string;
+    matrixNodeIds?: string[];
     isBurned?: boolean;
     burnedAt?: Date;
     expiresAt?: Date;
@@ -19,6 +20,7 @@ export declare class TokenVaultEntity {
     readonly channel?: string;
     readonly employeeId?: string;
     readonly nodeId?: string;
+    readonly matrixNodeIds: string[];
     isBurned: boolean;
     burnedAt?: Date;
     readonly expiresAt?: Date;

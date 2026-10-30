@@ -5,7 +5,7 @@ const project_entity_1 = require("../../../domain/entities/project.entity");
 const project_schema_1 = require("./project.schema");
 class ProjectMongoRepository {
     toEntity(doc) {
-        return new project_entity_1.ProjectEntity({
+        const entity = new project_entity_1.ProjectEntity({
             projectId: doc.projectId,
             name: doc.name,
             status: doc.status,
@@ -35,6 +35,10 @@ class ProjectMongoRepository {
             createdAt: doc.createdAt,
             updatedAt: doc.updatedAt,
         });
+        entity.tenantId = doc.tenantId;
+        entity.tenantName = doc.tenantName;
+        entity.consultantFirmId = doc.consultantFirmId;
+        return entity;
     }
     async save(project) {
         const raw = project.toJSON();

@@ -9,6 +9,7 @@ export interface SurveyResponseProps {
     respondentType: AnonymityLevel;
     responseToken?: string;
     nodeId?: string;
+    matrixNodeIds?: string[];
     demographicSnapshot?: Record<string, any>;
     answers: (AnswerValueObject | AnswerProps)[];
     submittedAt?: Date;
@@ -23,6 +24,7 @@ export declare class SurveyResponseEntity {
     readonly respondentType: AnonymityLevel;
     readonly responseToken?: string;
     readonly nodeId?: string;
+    readonly matrixNodeIds: string[];
     readonly demographicSnapshot: Record<string, any>;
     readonly answers: AnswerValueObject[];
     readonly submittedAt: Date;

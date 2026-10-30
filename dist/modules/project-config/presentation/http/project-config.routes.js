@@ -66,18 +66,19 @@ function createProjectConfigRouter(repo, cacheRepo) {
     router.get('/public/branding', getBrandingHandler);
     router.get('/project-config', getBrandingHandler);
     // 2. Protected Endpoints (Require Bearer Token)
-    router.post('/projects', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([auth_middleware_1.UserRole.SUPER_ADMIN, auth_middleware_1.UserRole.CONSULTANT_DAASH]), controller.createProject);
+    router.post('/projects', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([auth_middleware_1.UserRole.SUPER_ADMIN, auth_middleware_1.UserRole.CONSULTANT_DAASH, auth_middleware_1.UserRole.CONSULTANT]), controller.createProject);
     router.get('/projects', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([
         auth_middleware_1.UserRole.SUPER_ADMIN,
         auth_middleware_1.UserRole.PROJECT_ADMIN,
         auth_middleware_1.UserRole.CONSULTANT_DAASH,
+        auth_middleware_1.UserRole.CONSULTANT,
         auth_middleware_1.UserRole.HR_MANAGER,
         auth_middleware_1.UserRole.DEPARTMENT_MANAGER,
         auth_middleware_1.UserRole.SURVEY_AUTHOR,
         auth_middleware_1.UserRole.REPORT_VIEWER,
     ]), controller.listProjects);
-    router.get('/projects/:projectId', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([auth_middleware_1.UserRole.SUPER_ADMIN, auth_middleware_1.UserRole.PROJECT_ADMIN, auth_middleware_1.UserRole.CONSULTANT_DAASH]), controller.getProject);
-    router.put('/projects/:projectId', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([auth_middleware_1.UserRole.SUPER_ADMIN, auth_middleware_1.UserRole.PROJECT_ADMIN, auth_middleware_1.UserRole.CONSULTANT_DAASH]), controller.updateProject);
+    router.get('/projects/:projectId', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([auth_middleware_1.UserRole.SUPER_ADMIN, auth_middleware_1.UserRole.PROJECT_ADMIN, auth_middleware_1.UserRole.CONSULTANT_DAASH, auth_middleware_1.UserRole.CONSULTANT]), controller.getProject);
+    router.put('/projects/:projectId', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([auth_middleware_1.UserRole.SUPER_ADMIN, auth_middleware_1.UserRole.PROJECT_ADMIN, auth_middleware_1.UserRole.CONSULTANT_DAASH, auth_middleware_1.UserRole.CONSULTANT,]), controller.updateProject);
     router.patch('/projects/:projectId/features', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([auth_middleware_1.UserRole.SUPER_ADMIN]), controller.toggleFeatures);
     router.delete('/projects/:projectId', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([auth_middleware_1.UserRole.SUPER_ADMIN]), controller.deleteProject);
     // 2b. Presigned S3 Asset Upload for Brand Logos & Themes (GAP-012 / TASK-06-02)
@@ -128,11 +129,12 @@ function createProjectConfigRouter(repo, cacheRepo) {
         auth_middleware_1.UserRole.SUPER_ADMIN,
         auth_middleware_1.UserRole.PROJECT_ADMIN,
         auth_middleware_1.UserRole.CONSULTANT_DAASH,
+        auth_middleware_1.UserRole.CONSULTANT,
         auth_middleware_1.UserRole.ORG_ADMIN,
         auth_middleware_1.UserRole.HR_MANAGER,
     ]), presignedUploadHandler);
     // 3. Outbound Email Gateway Config Endpoints (PROMPT-22)
-    router.get('/projects/:projectId/config/email', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([auth_middleware_1.UserRole.SUPER_ADMIN, auth_middleware_1.UserRole.PROJECT_ADMIN, auth_middleware_1.UserRole.CONSULTANT_DAASH, auth_middleware_1.UserRole.ORG_ADMIN]), async (req, res, next) => {
+    router.get('/projects/:projectId/config/email', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([auth_middleware_1.UserRole.SUPER_ADMIN, auth_middleware_1.UserRole.PROJECT_ADMIN, auth_middleware_1.UserRole.CONSULTANT_DAASH, auth_middleware_1.UserRole.CONSULTANT, auth_middleware_1.UserRole.ORG_ADMIN]), async (req, res, next) => {
         try {
             const { projectId } = req.params;
             const project = await repository.findByProjectId(projectId);
@@ -153,7 +155,7 @@ function createProjectConfigRouter(repo, cacheRepo) {
             next(err);
         }
     });
-    router.put('/projects/:projectId/config/email', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([auth_middleware_1.UserRole.SUPER_ADMIN, auth_middleware_1.UserRole.PROJECT_ADMIN, auth_middleware_1.UserRole.CONSULTANT_DAASH]), async (req, res, next) => {
+    router.put('/projects/:projectId/config/email', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([auth_middleware_1.UserRole.SUPER_ADMIN, auth_middleware_1.UserRole.PROJECT_ADMIN, auth_middleware_1.UserRole.CONSULTANT_DAASH, auth_middleware_1.UserRole.CONSULTANT]), async (req, res, next) => {
         try {
             const { projectId } = req.params;
             const project = await repository.findByProjectId(projectId);
@@ -186,7 +188,7 @@ function createProjectConfigRouter(repo, cacheRepo) {
             next(err);
         }
     });
-    router.post('/projects/:projectId/config/email/test', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([auth_middleware_1.UserRole.SUPER_ADMIN, auth_middleware_1.UserRole.PROJECT_ADMIN, auth_middleware_1.UserRole.CONSULTANT_DAASH]), async (req, res, next) => {
+    router.post('/projects/:projectId/config/email/test', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([auth_middleware_1.UserRole.SUPER_ADMIN, auth_middleware_1.UserRole.PROJECT_ADMIN, auth_middleware_1.UserRole.CONSULTANT_DAASH, auth_middleware_1.UserRole.CONSULTANT]), async (req, res, next) => {
         try {
             const { projectId } = req.params;
             const { recipientEmail, config } = req.body || {};
@@ -201,7 +203,7 @@ function createProjectConfigRouter(repo, cacheRepo) {
         }
     });
     // 4. AI Engine & NLP Routing Endpoints (PROMPT-22)
-    router.get('/projects/:projectId/config/ai', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([auth_middleware_1.UserRole.SUPER_ADMIN, auth_middleware_1.UserRole.PROJECT_ADMIN, auth_middleware_1.UserRole.CONSULTANT_DAASH]), async (req, res, next) => {
+    router.get('/projects/:projectId/config/ai', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([auth_middleware_1.UserRole.SUPER_ADMIN, auth_middleware_1.UserRole.PROJECT_ADMIN, auth_middleware_1.UserRole.CONSULTANT_DAASH, auth_middleware_1.UserRole.CONSULTANT]), async (req, res, next) => {
         try {
             const { projectId } = req.params;
             const project = await repository.findByProjectId(projectId);
@@ -222,7 +224,7 @@ function createProjectConfigRouter(repo, cacheRepo) {
             next(err);
         }
     });
-    router.put('/projects/:projectId/config/ai', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([auth_middleware_1.UserRole.SUPER_ADMIN, auth_middleware_1.UserRole.PROJECT_ADMIN, auth_middleware_1.UserRole.CONSULTANT_DAASH]), async (req, res, next) => {
+    router.put('/projects/:projectId/config/ai', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([auth_middleware_1.UserRole.SUPER_ADMIN, auth_middleware_1.UserRole.PROJECT_ADMIN, auth_middleware_1.UserRole.CONSULTANT_DAASH, auth_middleware_1.UserRole.CONSULTANT]), async (req, res, next) => {
         try {
             const { projectId } = req.params;
             const project = await repository.findByProjectId(projectId);
@@ -262,7 +264,7 @@ function createProjectConfigRouter(repo, cacheRepo) {
             next(err);
         }
     });
-    router.post('/projects/:projectId/config/ai/test', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([auth_middleware_1.UserRole.SUPER_ADMIN, auth_middleware_1.UserRole.PROJECT_ADMIN, auth_middleware_1.UserRole.CONSULTANT_DAASH]), async (req, res, next) => {
+    router.post('/projects/:projectId/config/ai/test', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([auth_middleware_1.UserRole.SUPER_ADMIN, auth_middleware_1.UserRole.PROJECT_ADMIN, auth_middleware_1.UserRole.CONSULTANT_DAASH, auth_middleware_1.UserRole.CONSULTANT]), async (req, res, next) => {
         try {
             const { projectId } = req.params;
             const { testPrompt, config } = req.body || {};
@@ -397,7 +399,7 @@ function createProjectConfigRouter(repo, cacheRepo) {
         }
     });
     // 5. Custom Domain & SAML SSO Verification Endpoints (GAP-015 / TASK-04-02)
-    router.post('/projects/:projectId/verify-domain', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([auth_middleware_1.UserRole.SUPER_ADMIN, auth_middleware_1.UserRole.PROJECT_ADMIN, auth_middleware_1.UserRole.CONSULTANT_DAASH]), async (req, res, next) => {
+    router.post('/projects/:projectId/verify-domain', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([auth_middleware_1.UserRole.SUPER_ADMIN, auth_middleware_1.UserRole.PROJECT_ADMIN, auth_middleware_1.UserRole.CONSULTANT_DAASH, auth_middleware_1.UserRole.CONSULTANT]), async (req, res, next) => {
         try {
             const { projectId } = req.params;
             const project = await repository.findByProjectId(projectId);
@@ -488,7 +490,7 @@ function createProjectConfigRouter(repo, cacheRepo) {
             next(err);
         }
     });
-    router.get('/projects/:projectId/config/security', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([auth_middleware_1.UserRole.SUPER_ADMIN, auth_middleware_1.UserRole.PROJECT_ADMIN, auth_middleware_1.UserRole.CONSULTANT_DAASH]), async (req, res, next) => {
+    router.get('/projects/:projectId/config/security', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([auth_middleware_1.UserRole.SUPER_ADMIN, auth_middleware_1.UserRole.PROJECT_ADMIN, auth_middleware_1.UserRole.CONSULTANT_DAASH, auth_middleware_1.UserRole.CONSULTANT]), async (req, res, next) => {
         try {
             const { projectId } = req.params;
             const project = await repository.findByProjectId(projectId);
@@ -527,7 +529,7 @@ function createProjectConfigRouter(repo, cacheRepo) {
             next(err);
         }
     });
-    router.put('/projects/:projectId/config/security', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([auth_middleware_1.UserRole.SUPER_ADMIN, auth_middleware_1.UserRole.PROJECT_ADMIN, auth_middleware_1.UserRole.CONSULTANT_DAASH]), async (req, res, next) => {
+    router.put('/projects/:projectId/config/security', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([auth_middleware_1.UserRole.SUPER_ADMIN, auth_middleware_1.UserRole.PROJECT_ADMIN, auth_middleware_1.UserRole.CONSULTANT_DAASH, auth_middleware_1.UserRole.CONSULTANT]), async (req, res, next) => {
         try {
             const { projectId } = req.params;
             const project = await repository.findByProjectId(projectId);

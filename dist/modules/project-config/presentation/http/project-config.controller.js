@@ -35,7 +35,9 @@ class ProjectConfigController {
                 throw new error_middleware_1.AppError(400, errorDetail, 'https://tesp-api.talnova.io/errors/validation-failed', parsed.error.format());
             }
             // If created by a Consultant, link project tenantId to consultant firmId
-            if (req.user && req.user.role === auth_middleware_1.UserRole.CONSULTANT_DAASH && mongoose_1.default.connection?.readyState === 1) {
+            const isConsultant = req.user &&
+                (req.user.role === auth_middleware_1.UserRole.CONSULTANT || req.user.role === auth_middleware_1.UserRole.CONSULTANT_DAASH);
+            if (isConsultant && mongoose_1.default.connection?.readyState === 1) {
                 const consultantUser = await user_schema_1.UserModel.findOne({ userId: req.user.userId }).exec();
                 if (consultantUser?.firmId) {
                     parsed.data.tenantId = consultantUser.firmId;
@@ -44,7 +46,7 @@ class ProjectConfigController {
             const actorContext = req.user ? { actorId: req.user.userId, actorRole: req.user.role } : undefined;
             const project = await this.createProjectUseCase.execute(parsed.data, actorContext);
             // Automatically append project to consultant's authorizedProjectIds in UserModel
-            if (req.user && req.user.role === auth_middleware_1.UserRole.CONSULTANT_DAASH && project.projectId && mongoose_1.default.connection?.readyState === 1) {
+            if (isConsultant && project.projectId && mongoose_1.default.connection?.readyState === 1) {
                 await user_schema_1.UserModel.updateOne({ userId: req.user.userId }, { $addToSet: { authorizedProjectIds: project.projectId } }).exec();
             }
             // Perform WCAG Contrast Advisory check (Sec 20 feature)

@@ -22,6 +22,7 @@ const audit_logger_1 = require("../../../../shared/infrastructure/audit/audit-lo
 const auth_middleware_1 = require("../../../../shared/presentation/middleware/auth.middleware");
 const event_bus_1 = require("../../../../shared/domain/events/event-bus");
 const system_email_service_1 = require("../../../../shared/infrastructure/email/system-email.service");
+const notification_service_1 = require("../../../notification/infrastructure/services/notification.service");
 const config_1 = require("../../../../config");
 const crypto_1 = __importDefault(require("crypto"));
 function createTenantManagementRouter() {
@@ -48,7 +49,7 @@ function createTenantManagementRouter() {
                 survey_response_schema_1.SurveyResponseModel.countDocuments({ isDeleted: { $ne: true } }),
                 audit_log_schema_1.AuditLogModel.countDocuments({}),
             ]);
-            const tenantIds = new Set(projects.map((p) => p.tenantId || 'TENANT-DAASH'));
+            const tenantIds = new Set(projects.map((p) => p.tenantId || (p.consultantFirmId ? `TENANT-${p.consultantFirmId}` : `TENANT-${p.projectId}`)));
             let globalResponseCap = 0;
             let globalAiTokenCap = 0;
             for (const p of projects) {
@@ -162,8 +163,9 @@ function createTenantManagementRouter() {
                     projectId: p.projectId,
                     name: p.name,
                     clientOrgName: p.clientOrgName || p.branding?.companyName || p.name,
-                    tenantId: p.tenantId || 'TENANT-DAASH',
-                    tenantName: p.tenantName || 'Daash Global Advisory',
+                    tenantId: p.tenantId || (p.consultantFirmId ? `TENANT-${p.consultantFirmId}` : `TENANT-${p.projectId}`),
+                    tenantName: p.tenantName || p.clientOrgName || p.branding?.companyName || p.name,
+                    consultantFirmId: p.consultantFirmId || p.firmId,
                     tier: p.tier || 'ENTERPRISE',
                     status: p.status || 'ACTIVE',
                     branding: p.branding,
@@ -220,12 +222,32 @@ function createTenantManagementRouter() {
                     detail: `Project with ID ${projectId} already exists`,
                 });
             }
+            const firmIdToUse = req.body.consultantFirmId || req.body.firmId;
+            let resolvedTenantName = tenantName;
+            if (!resolvedTenantName && firmIdToUse) {
+                try {
+                    if (mongoose_1.default.connection?.readyState === 1) {
+                        const firmDoc = await consulting_firm_schema_1.ConsultingFirmModel.findOne({ firmId: firmIdToUse }).lean();
+                        if (firmDoc) {
+                            resolvedTenantName = firmDoc.name;
+                        }
+                    }
+                }
+                catch {
+                    // ignore error
+                }
+            }
+            if (!resolvedTenantName) {
+                resolvedTenantName = clientOrgName || name;
+            }
+            const generatedTenantId = tenantId || (firmIdToUse ? `TENANT-${firmIdToUse}` : `TENANT-${projectId}`);
             const created = await project_schema_1.ProjectModel.create({
                 projectId,
                 name,
                 clientOrgName: clientOrgName || name,
-                tenantId: tenantId || 'TENANT-DAASH',
-                tenantName: tenantName || 'Daash Global Advisory',
+                tenantId: generatedTenantId,
+                tenantName: resolvedTenantName,
+                consultantFirmId: firmIdToUse,
                 tier: tier || 'ENTERPRISE',
                 status: 'ACTIVE',
                 branding: {
@@ -271,6 +293,10 @@ function createTenantManagementRouter() {
                     actorRole: 'SUPER_ADMIN',
                 },
             });
+            // Dispatch tenant provisioned in-app notification (non-blocking)
+            notification_service_1.notificationService
+                .notifyTenantProvisioned(projectId, name, undefined, created.tier)
+                .catch((e) => console.warn('[TenantManagement] Direct notification dispatch warning:', e));
             res.status(201).json(created);
         }
         catch (err) {
@@ -423,8 +449,8 @@ function createTenantManagementRouter() {
                 email: normalizedEmail,
                 firstName: firstName.trim(),
                 lastName: (lastName || '').trim(),
-                role: auth_middleware_1.UserRole.CONSULTANT_DAASH,
-                firmId,
+                role: auth_middleware_1.UserRole.CONSULTANT,
+                firmId: firm.firmId,
                 passwordHash,
                 authorizedProjectIds: projectList,
                 primaryProjectId,

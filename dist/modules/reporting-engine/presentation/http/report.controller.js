@@ -38,22 +38,27 @@ class ReportController {
                 body.campaignId = body.surveyId || 'CMP-1001';
             }
             if (!body.reportType || body.reportType === 'SCOPED_REPORT') {
-                if (body.format === 'EXCEL' || body.format === 'CSV') {
-                    body.reportType = 'RAW_RESPONSES_XLSX';
+                if (body.format === 'PROMPT') {
+                    body.reportType = 'AGENTIC_PROMPT_PACK';
                 }
                 else if (body.format === 'POWERPOINT') {
                     body.reportType = 'BOARDROOM_DECK_POWERPOINT';
+                }
+                else if (body.format === 'EXCEL' || body.format === 'CSV') {
+                    body.reportType = 'RAW_RESPONSES_XLSX';
                 }
                 else {
                     body.reportType = 'EXEC_SUMMARY_PDF';
                 }
             }
             // Check if caller is Super Admin or explicitly requested bypass
-            const isSuperAdmin = req.user?.role === auth_middleware_1.UserRole.SUPER_ADMIN;
-            if (body.bypassPrivacy === undefined) {
-                if (isSuperAdmin) {
-                    body.bypassPrivacy = true;
-                }
+            const isSuperAdmin = req.user?.role === auth_middleware_1.UserRole.SUPER_ADMIN ||
+                Boolean(req.user?.authorizedProjectIds?.includes('*'));
+            if (isSuperAdmin) {
+                body.bypassPrivacy = body.bypassPrivacy ?? true;
+            }
+            else {
+                body.bypassPrivacy = false;
             }
             const parsed = report_job_dto_1.RequestReportGenerationDtoSchema.safeParse(body);
             if (!parsed.success) {
@@ -126,7 +131,7 @@ class ReportController {
                 throw new error_middleware_1.AppError(400, 'Report ID is required for download');
             }
             // Security Check: Strictly validate reportId format to prevent directory traversal
-            const validReportIdPattern = /^[a-zA-Z0-9_-]+(\.(pdf|xlsx|pptx|csv))?$/i;
+            const validReportIdPattern = /^[a-zA-Z0-9_-]+(\.(pdf|xlsx|pptx|csv|md))?$/i;
             if (!validReportIdPattern.test(reportId) || reportId.includes('..') || reportId.includes('/') || reportId.includes('\\')) {
                 throw new error_middleware_1.AppError(400, 'Invalid report ID: Malformed or prohibited path characters');
             }
@@ -174,16 +179,24 @@ class ReportController {
             // Determine report extension / type
             let resolvedExt = ext ? ext.replace(/^\./, '').toLowerCase() : '';
             if (!resolvedExt && job) {
-                if (job.reportType?.includes('XLSX') || job.reportType?.includes('EXCEL'))
-                    resolvedExt = 'xlsx';
-                else if (job.reportType?.includes('PDF'))
-                    resolvedExt = 'pdf';
-                else if (job.reportType?.includes('CSV'))
-                    resolvedExt = 'csv';
+                if (job.reportType?.includes('PROMPT') ||
+                    job.reportType?.includes('AGENTIC') ||
+                    job.reportType?.includes('MD')) {
+                    resolvedExt = 'md';
+                }
                 else if (job.reportType?.includes('POWERPOINT') ||
                     job.reportType?.includes('PPTX') ||
                     job.reportType?.includes('PPT')) {
                     resolvedExt = 'pptx';
+                }
+                else if (job.reportType?.includes('XLSX') || job.reportType?.includes('EXCEL')) {
+                    resolvedExt = 'xlsx';
+                }
+                else if (job.reportType?.includes('CSV')) {
+                    resolvedExt = 'csv';
+                }
+                else if (job.reportType?.includes('PDF')) {
+                    resolvedExt = 'pdf';
                 }
             }
             if (!resolvedExt)
@@ -224,10 +237,11 @@ class ReportController {
             const reportsDir = path_1.default.resolve(process.cwd(), 'tmp', 'reports');
             const candidates = [
                 path_1.default.resolve(reportsDir, `${baseId}.${resolvedExt}`),
-                path_1.default.resolve(reportsDir, `${baseId}.pdf`),
-                path_1.default.resolve(reportsDir, `${baseId}.xlsx`),
-                path_1.default.resolve(reportsDir, `${baseId}.csv`),
+                path_1.default.resolve(reportsDir, `${baseId}.md`),
                 path_1.default.resolve(reportsDir, `${baseId}.pptx`),
+                path_1.default.resolve(reportsDir, `${baseId}.xlsx`),
+                path_1.default.resolve(reportsDir, `${baseId}.pdf`),
+                path_1.default.resolve(reportsDir, `${baseId}.csv`),
                 path_1.default.resolve(reportsDir, 'storage', 'reports', effectiveProjectId || '', `${baseId}.${resolvedExt}`),
             ];
             let foundPath = null;
@@ -246,13 +260,15 @@ class ReportController {
             if (!buffer && !foundPath) {
                 throw new error_middleware_1.AppError(404, 'Report file not found or expired');
             }
-            const contentType = resolvedExt === 'xlsx'
-                ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-                : resolvedExt === 'csv'
-                    ? 'text/csv'
-                    : resolvedExt === 'pptx'
-                        ? 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
-                        : 'application/pdf';
+            const contentType = resolvedExt === 'md'
+                ? 'text/markdown; charset=utf-8'
+                : resolvedExt === 'pptx'
+                    ? 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+                    : resolvedExt === 'xlsx'
+                        ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+                        : resolvedExt === 'csv'
+                            ? 'text/csv'
+                            : 'application/pdf';
             res.setHeader('Content-Type', contentType);
             res.setHeader('X-Presigned-Url', presignedUrl);
             if (buffer) {

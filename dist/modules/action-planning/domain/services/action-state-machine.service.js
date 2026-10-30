@@ -29,7 +29,7 @@ class ActionStateMachineService {
         if (current === 'PROPOSED' && target === 'APPROVED') {
             if (!userRole)
                 return false;
-            const allowedApprovers = [auth_middleware_1.UserRole.SUPER_ADMIN, auth_middleware_1.UserRole.PROJECT_ADMIN, auth_middleware_1.UserRole.HR_MANAGER, auth_middleware_1.UserRole.CONSULTANT_DAASH];
+            const allowedApprovers = [auth_middleware_1.UserRole.SUPER_ADMIN, auth_middleware_1.UserRole.PROJECT_ADMIN, auth_middleware_1.UserRole.HR_MANAGER, auth_middleware_1.UserRole.CONSULTANT_DAASH, auth_middleware_1.UserRole.CONSULTANT];
             return allowedApprovers.includes(userRole);
         }
         return true;

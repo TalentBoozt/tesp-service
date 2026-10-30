@@ -9,6 +9,7 @@ class TokenVaultEntity {
     channel;
     employeeId;
     nodeId;
+    matrixNodeIds;
     isBurned;
     burnedAt;
     expiresAt;
@@ -21,6 +22,7 @@ class TokenVaultEntity {
         this.channel = props.channel;
         this.employeeId = props.employeeId;
         this.nodeId = props.nodeId;
+        this.matrixNodeIds = Array.isArray(props.matrixNodeIds) ? [...props.matrixNodeIds] : [];
         this.isBurned = props.isBurned ?? false;
         this.burnedAt = props.burnedAt;
         this.expiresAt = props.expiresAt;
@@ -42,6 +44,7 @@ class TokenVaultEntity {
             channel: this.channel,
             employeeId: this.employeeId,
             nodeId: this.nodeId,
+            matrixNodeIds: [...this.matrixNodeIds],
             isBurned: this.isBurned,
             burnedAt: this.burnedAt,
             expiresAt: this.expiresAt,

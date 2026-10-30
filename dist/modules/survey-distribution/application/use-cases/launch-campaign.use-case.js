@@ -128,6 +128,7 @@ class LaunchCampaignUseCase {
                                 email: e.email,
                                 phone: e.phoneNumber,
                                 nodeId: e.nodeId,
+                                matrixNodeIds: e.matrixNodeIds,
                             });
                         }
                     }
@@ -143,6 +144,7 @@ class LaunchCampaignUseCase {
                             email: e.email,
                             phone: e.phoneNumber,
                             nodeId: e.nodeId,
+                            matrixNodeIds: e.matrixNodeIds,
                         });
                     }
                 }
@@ -215,6 +217,7 @@ class LaunchCampaignUseCase {
                 channel,
                 employeeId: command.anonymityLevel === campaign_entity_1.AnonymityLevel.FULLY_ANONYMOUS ? undefined : emp.employeeId,
                 nodeId: emp.nodeId,
+                matrixNodeIds: emp.matrixNodeIds || [],
                 expiresAt: command.expirationDate,
             }));
             const payload = {
@@ -224,6 +227,7 @@ class LaunchCampaignUseCase {
                 surveyVersion: command.surveyVersion,
                 anonymityLevel: command.anonymityLevel,
                 nodeId: emp.nodeId,
+                matrixNodeIds: emp.matrixNodeIds || [],
                 employeeId: command.anonymityLevel === campaign_entity_1.AnonymityLevel.FULLY_ANONYMOUS ? undefined : emp.employeeId,
                 expirationDate: command.expirationDate.toISOString(),
                 channel,

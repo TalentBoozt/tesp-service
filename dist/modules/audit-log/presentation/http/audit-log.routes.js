@@ -13,7 +13,7 @@ function createAuditLogRouter(service) {
      * List audit logs with pagination and filters
      * Accessible by SUPER_ADMIN, PROJECT_ADMIN, and CONSULTANT_DAASH
      */
-    router.get('/audit-logs', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([auth_middleware_1.UserRole.SUPER_ADMIN, auth_middleware_1.UserRole.PROJECT_ADMIN, auth_middleware_1.UserRole.CONSULTANT_DAASH]), async (req, res, next) => {
+    router.get('/audit-logs', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([auth_middleware_1.UserRole.SUPER_ADMIN, auth_middleware_1.UserRole.PROJECT_ADMIN, auth_middleware_1.UserRole.CONSULTANT_DAASH, auth_middleware_1.UserRole.CONSULTANT]), async (req, res, next) => {
         try {
             const user = req.user;
             const requestedProjectId = req.query.projectId || undefined;
@@ -46,7 +46,7 @@ function createAuditLogRouter(service) {
      * POST /api/v1/audit-logs
      * Manually record an explicit audit event (e.g. client report export or compliance action)
      */
-    router.post('/audit-logs', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([auth_middleware_1.UserRole.SUPER_ADMIN, auth_middleware_1.UserRole.PROJECT_ADMIN, auth_middleware_1.UserRole.CONSULTANT_DAASH]), async (req, res, next) => {
+    router.post('/audit-logs', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([auth_middleware_1.UserRole.SUPER_ADMIN, auth_middleware_1.UserRole.PROJECT_ADMIN, auth_middleware_1.UserRole.CONSULTANT_DAASH, auth_middleware_1.UserRole.CONSULTANT,]), async (req, res, next) => {
         try {
             const user = req.user;
             const { action, resourceType, resourceId, metadata } = req.body;
@@ -81,7 +81,7 @@ function createAuditLogRouter(service) {
      * GET /api/v1/audit-logs/metadata/filters
      * Returns available filter values (actions, resourceTypes)
      */
-    router.get('/audit-logs/metadata/filters', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([auth_middleware_1.UserRole.SUPER_ADMIN, auth_middleware_1.UserRole.PROJECT_ADMIN, auth_middleware_1.UserRole.CONSULTANT_DAASH]), (_req, res) => {
+    router.get('/audit-logs/metadata/filters', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([auth_middleware_1.UserRole.SUPER_ADMIN, auth_middleware_1.UserRole.PROJECT_ADMIN, auth_middleware_1.UserRole.CONSULTANT_DAASH, auth_middleware_1.UserRole.CONSULTANT,]), (_req, res) => {
         res.status(200).json({
             actions: [
                 'SURVEY_PUBLISHED',

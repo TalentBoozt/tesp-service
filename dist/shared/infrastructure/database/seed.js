@@ -16,6 +16,7 @@ const user_schema_1 = require("../../../modules/auth/infrastructure/persistence/
 const auth_middleware_1 = require("../../presentation/middleware/auth.middleware");
 const auth_seeder_service_1 = require("../../../modules/auth/infrastructure/services/auth-seeder.service");
 const consulting_firm_seeder_service_1 = require("../../../modules/consultant/infrastructure/services/consulting-firm-seeder.service");
+const bcrypt_hasher_service_1 = require("../../../modules/auth/infrastructure/services/bcrypt-hasher.service");
 async function seedDatabase() {
     if (process.env.NODE_ENV === 'production' && process.env.ALLOW_DESTRUCTIVE_SEED !== 'true') {
         const errorMsg = 'FATAL: Database seed script cannot be executed in production environment without explicit ALLOW_DESTRUCTIVE_SEED=true!';
@@ -37,6 +38,89 @@ async function seedDatabase() {
     const firmSeeder = new consulting_firm_seeder_service_1.ConsultingFirmSeederService();
     await firmSeeder.seedDefaultFirms(true);
     console.log('[TESP Seeder] Consulting firms seeded successfully.');
+    console.log('[TESP Seeder] Seeding canonical multi-firm consultant accounts...');
+    const hasher = new bcrypt_hasher_service_1.BcryptHasherService();
+    const consultantPasswordHash = await hasher.hashPassword('Password@123!');
+    const consultantUsers = [
+        {
+            userId: 'USR-CONSULTANT',
+            email: 'consultant@daashglobal.com',
+            passwordHash: consultantPasswordHash,
+            firstName: 'Samantha',
+            lastName: 'Perera',
+            role: auth_middleware_1.UserRole.CONSULTANT,
+            firmId: 'FIRM-DAASH-01',
+            primaryProjectId: 'PRJ-99201',
+            authorizedProjectIds: ['PRJ-99201', 'PRJ-NESTLE'],
+            mustChangePassword: false,
+            failedLoginAttempts: 0,
+            isActive: true,
+            isEmailVerified: true,
+        },
+        {
+            userId: 'USR-CONSULTANT-01',
+            email: 'advisory@daashglobal.com',
+            passwordHash: consultantPasswordHash,
+            firstName: 'Tanya',
+            lastName: 'Jayawardena',
+            role: auth_middleware_1.UserRole.CONSULTANT,
+            firmId: 'FIRM-DAASH-01',
+            primaryProjectId: 'PRJ-99201',
+            authorizedProjectIds: ['PRJ-99201', 'PRJ-NESTLE'],
+            mustChangePassword: false,
+            failedLoginAttempts: 0,
+            isActive: true,
+            isEmailVerified: true,
+        },
+        {
+            userId: 'USR-CONSULTANT-TALNOVA',
+            email: 'advisory@talnova.io',
+            passwordHash: consultantPasswordHash,
+            firstName: 'Dinesh',
+            lastName: 'Wickramasinghe',
+            role: auth_middleware_1.UserRole.CONSULTANT,
+            firmId: 'FIRM-TALNOVA-01',
+            primaryProjectId: 'PRJ-APAC01',
+            authorizedProjectIds: ['PRJ-APAC01', 'PRJ-99202'],
+            mustChangePassword: false,
+            failedLoginAttempts: 0,
+            isActive: true,
+            isEmailVerified: true,
+        },
+        {
+            userId: 'USR-CONSULTANT-MCKINSEY',
+            email: 'advisory@mckinsey.com',
+            passwordHash: consultantPasswordHash,
+            firstName: 'Elena',
+            lastName: 'Rostova',
+            role: auth_middleware_1.UserRole.CONSULTANT,
+            firmId: 'FIRM-MCKINSEY-01',
+            primaryProjectId: 'PRJ-APAC01',
+            authorizedProjectIds: ['PRJ-APAC01'],
+            mustChangePassword: false,
+            failedLoginAttempts: 0,
+            isActive: true,
+            isEmailVerified: true,
+        },
+        {
+            userId: 'USR-ORGADMIN',
+            email: 'orgadmin@aitkenspence.com',
+            passwordHash: consultantPasswordHash,
+            firstName: 'Roshan',
+            lastName: 'Fernando',
+            role: auth_middleware_1.UserRole.ORG_ADMIN,
+            primaryProjectId: 'PRJ-99201',
+            authorizedProjectIds: ['PRJ-99201'],
+            mustChangePassword: false,
+            failedLoginAttempts: 0,
+            isActive: true,
+            isEmailVerified: true,
+        },
+    ];
+    for (const cu of consultantUsers) {
+        await user_schema_1.UserModel.findOneAndUpdate({ email: cu.email }, { $set: cu }, { upsert: true, new: true });
+    }
+    console.log('[TESP Seeder] Canonical multi-firm consultant and client accounts seeded.');
     const projectId = 'PRJ-99201'; // Aitken Spence PLC
     const apacProjectId = 'PRJ-APAC01'; // Dialog Axiata PLC
     const nestleProjectId = 'PRJ-NESTLE'; // Nestlé Lanka
@@ -62,8 +146,9 @@ async function seedDatabase() {
         projectId,
         name: 'Aitken Spence PLC',
         clientOrgName: 'Aitken Spence PLC',
-        tenantId: 'TENANT-DAASH',
+        tenantId: 'TENANT-FIRM-DAASH-01',
         tenantName: 'Daash Global Advisory',
+        consultantFirmId: 'FIRM-DAASH-01',
         status: 'ACTIVE',
         tier: 'ENTERPRISE',
         budgets: {
@@ -122,8 +207,9 @@ async function seedDatabase() {
         projectId: apacProjectId,
         name: 'Dialog Axiata PLC',
         clientOrgName: 'Dialog Axiata PLC',
-        tenantId: 'TENANT-DAASH',
-        tenantName: 'Daash Global Advisory',
+        tenantId: 'TENANT-FIRM-TALNOVA-01',
+        tenantName: 'Talnova Human Capital Advisory',
+        consultantFirmId: 'FIRM-TALNOVA-01',
         status: 'ACTIVE',
         tier: 'ENTERPRISE',
         budgets: {
@@ -184,8 +270,9 @@ async function seedDatabase() {
         projectId: nestleProjectId,
         name: 'Nestlé Lanka',
         clientOrgName: 'Nestlé Lanka',
-        tenantId: 'TENANT-DAASH',
+        tenantId: 'TENANT-FIRM-DAASH-01',
         tenantName: 'Daash Global Advisory',
+        consultantFirmId: 'FIRM-DAASH-01',
         status: 'ACTIVE',
         tier: 'SCALE',
         budgets: {
@@ -1288,11 +1375,92 @@ async function seedDatabase() {
             p50MedianScore: 78.0,
             p90TopDecileScore: 93.0,
         },
+        {
+            metricKey: 'CAREER_GROWTH',
+            metricName: 'Regulatory Compliance & Meritocratic Mobility',
+            sector: 'FINANCIAL_SERVICES',
+            p25Score: 54.0,
+            p50MedianScore: 68.0,
+            p90TopDecileScore: 84.0,
+        },
+        {
+            metricKey: 'SAFETY_COMPLIANCE',
+            metricName: 'Whistleblower Safety & Conduct Governance',
+            sector: 'FINANCIAL_SERVICES',
+            p25Score: 76.0,
+            p50MedianScore: 86.0,
+            p90TopDecileScore: 95.0,
+        },
+        {
+            metricKey: 'ENPS',
+            metricName: 'Employee Net Promoter Score (eNPS)',
+            sector: 'TELECOM_TECH',
+            p25Score: 22.0,
+            p50MedianScore: 42.0,
+            p90TopDecileScore: 68.0,
+        },
+        {
+            metricKey: 'CAREER_GROWTH',
+            metricName: 'Technical Upskilling & Agile Architecture',
+            sector: 'TELECOM_TECH',
+            p25Score: 60.0,
+            p50MedianScore: 73.0,
+            p90TopDecileScore: 89.0,
+        },
+        {
+            metricKey: 'LEADERSHIP_TRUST',
+            metricName: 'Engineering Autonomy & Executive Vision',
+            sector: 'TELECOM_TECH',
+            p25Score: 59.0,
+            p50MedianScore: 72.0,
+            p90TopDecileScore: 88.0,
+        },
+        {
+            metricKey: 'SAFETY_COMPLIANCE',
+            metricName: 'On-Call Burnout & Psychological Safety',
+            sector: 'TELECOM_TECH',
+            p25Score: 68.0,
+            p50MedianScore: 79.0,
+            p90TopDecileScore: 91.0,
+        },
+        {
+            metricKey: 'ENPS',
+            metricName: 'Employee Net Promoter Score (eNPS)',
+            sector: 'DIVERSIFIED_CONGLOMERATE',
+            p25Score: 14.0,
+            p50MedianScore: 34.0,
+            p90TopDecileScore: 59.0,
+        },
+        {
+            metricKey: 'CAREER_GROWTH',
+            metricName: 'Cross-Business Unit Mobility & Leadership Development',
+            sector: 'DIVERSIFIED_CONGLOMERATE',
+            p25Score: 52.0,
+            p50MedianScore: 67.0,
+            p90TopDecileScore: 83.0,
+        },
+        {
+            metricKey: 'LEADERSHIP_TRUST',
+            metricName: 'Conglomerate Board Transparency & Ethical Direction',
+            sector: 'DIVERSIFIED_CONGLOMERATE',
+            p25Score: 61.0,
+            p50MedianScore: 75.0,
+            p90TopDecileScore: 90.0,
+        },
+        {
+            metricKey: 'SAFETY_COMPLIANCE',
+            metricName: 'Multi-Site Safety Standards & Audit Integrity',
+            sector: 'DIVERSIFIED_CONGLOMERATE',
+            p25Score: 77.0,
+            p50MedianScore: 87.0,
+            p90TopDecileScore: 96.0,
+        },
     ]);
-    console.log('[TESP Seeder] 9. Seeding Client Engagements for Daash Global Advisory...');
+    console.log('[TESP Seeder] 9. Seeding Client Engagements for Multi-Consultant Advisory Firms...');
     await consultant_models_1.ClientEngagementModel.insertMany([
         {
             projectId,
+            firmId: 'FIRM-DAASH-01',
             clientName: 'Aitken Spence PLC',
             clientCode: 'ASP',
             sector: 'MANUFACTURING_FMCG',
@@ -1307,10 +1475,11 @@ async function seedDatabase() {
         },
         {
             projectId: apacProjectId,
+            firmId: 'FIRM-TALNOVA-01',
             clientName: 'Dialog Axiata PLC',
             clientCode: 'DIA',
             sector: 'GLOBAL_TECH',
-            leadConsultant: 'Michael Vandort (Daash Global)',
+            leadConsultant: 'Michael Vandort (Talnova Human Capital Advisory)',
             stage: 'ACTION_SIGNOFF',
             health: 'OPTIMAL',
             responseRate: 91.5,
@@ -1321,6 +1490,7 @@ async function seedDatabase() {
         },
         {
             projectId: nestleProjectId,
+            firmId: 'FIRM-DAASH-01',
             clientName: 'Nestlé Lanka',
             clientCode: 'NES',
             sector: 'MANUFACTURING_FMCG',
@@ -1338,6 +1508,7 @@ async function seedDatabase() {
     await consultant_models_1.ExecutiveWorkshopModel.insertMany([
         {
             projectId,
+            firmId: 'FIRM-DAASH-01',
             title: 'Executive Strategic Alignment & Frontline Culture Workshop',
             clientName: 'Aitken Spence PLC',
             consultantLead: 'Dr. Samantha Perera (Daash Global)',
@@ -1355,9 +1526,10 @@ async function seedDatabase() {
         },
         {
             projectId: apacProjectId,
+            firmId: 'FIRM-TALNOVA-01',
             title: 'Agile Engineering Retention & DevOps On-Call Balance',
             clientName: 'Dialog Axiata PLC',
-            consultantLead: 'Michael Vandort (Daash Global)',
+            consultantLead: 'Michael Vandort (Talnova Human Capital Advisory)',
             scheduledDate: '2026-09-22',
             status: 'READY_FOR_EXEC',
             keyThemes: ['Cloud SRE Burnout Risk', 'Career Progression Banding Transparency'],
@@ -1369,6 +1541,7 @@ async function seedDatabase() {
         },
         {
             projectId: nestleProjectId,
+            firmId: 'FIRM-DAASH-01',
             title: 'Factory Safety Culture & Ergonomics Alignment',
             clientName: 'Nestlé Lanka',
             consultantLead: 'Tanya Jayawardena (Daash Global)',
@@ -1386,6 +1559,7 @@ async function seedDatabase() {
     await consultant_models_1.AiSignoffModel.insertMany([
         {
             projectId,
+            firmId: 'FIRM-DAASH-01',
             surveyTitle: '2026 Aitken Spence Enterprise Engagement Survey',
             aiGeneratedInsight: 'Maritime and freight shift workers express 2.8x higher concern regarding physical workload and overtime transparency compared to corporate hospitality management.',
             confidenceScore: 94.2,
@@ -1397,6 +1571,7 @@ async function seedDatabase() {
         },
         {
             projectId: apacProjectId,
+            firmId: 'FIRM-TALNOVA-01',
             surveyTitle: '2026 Dialog Axiata Leadership & Digital Agility Survey',
             aiGeneratedInsight: 'DevOps and SRE teams report elevated alert fatigue during overnight release cycles, correlating with a 15-point drop in team psychological safety.',
             confidenceScore: 91.4,
@@ -1408,6 +1583,7 @@ async function seedDatabase() {
         },
         {
             projectId: nestleProjectId,
+            firmId: 'FIRM-DAASH-01',
             surveyTitle: '2026 Nestlé Lanka Safety & Operational Excellence Diagnostic',
             aiGeneratedInsight: 'Packaging line operators at Pannala factory indicate hesitation to log minor machine jams due to line stoppage performance metrics.',
             confidenceScore: 89.8,
@@ -1508,7 +1684,7 @@ async function seedDatabase() {
         {
             notificationId: 'NTF-99201-0001',
             projectId: 'PRJ-99201',
-            recipientRole: auth_middleware_1.UserRole.CONSULTANT_DAASH,
+            recipientRole: auth_middleware_1.UserRole.CONSULTANT,
             category: 'AI_ANOMALY',
             severity: 'CRITICAL',
             title: 'NLP Sentiment Variance Spike (-14.2%)',
@@ -1583,7 +1759,7 @@ async function seedDatabase() {
         {
             notificationId: 'NTF-APAC01-0002',
             projectId: 'PRJ-APAC01',
-            recipientRole: auth_middleware_1.UserRole.CONSULTANT_DAASH,
+            recipientRole: auth_middleware_1.UserRole.CONSULTANT,
             category: 'AI_ANOMALY',
             severity: 'CRITICAL',
             title: 'Network Operations Division: Attrition Risk Alert',
@@ -1616,8 +1792,17 @@ async function seedDatabase() {
     });
     const consultantJwt = (0, auth_middleware_1.generateToken)({
         userId: 'USR-CONSULTANT',
-        role: auth_middleware_1.UserRole.CONSULTANT_DAASH,
+        role: auth_middleware_1.UserRole.CONSULTANT,
         projectId,
+        firmId: 'FIRM-DAASH-01',
+        firmName: 'Daash Global Advisory',
+    });
+    const talnovaConsultantJwt = (0, auth_middleware_1.generateToken)({
+        userId: 'USR-CONSULTANT-TALNOVA',
+        role: auth_middleware_1.UserRole.CONSULTANT,
+        projectId: apacProjectId,
+        firmId: 'FIRM-TALNOVA-01',
+        firmName: 'Talnova Human Capital Advisory',
     });
     const orgAdminJwt = (0, auth_middleware_1.generateToken)({
         userId: 'USR-ORGADMIN',

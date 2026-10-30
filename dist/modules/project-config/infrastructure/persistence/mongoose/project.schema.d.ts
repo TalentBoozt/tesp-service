@@ -55,6 +55,7 @@ export interface IProjectDocument extends Document {
     };
     tenantId?: string;
     tenantName?: string;
+    consultantFirmId?: string;
     clientOrgName?: string;
     tier?: 'ENTERPRISE' | 'SCALE' | 'GROWTH';
     budgets?: {

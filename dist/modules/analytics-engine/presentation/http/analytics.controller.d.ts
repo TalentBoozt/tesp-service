@@ -17,4 +17,5 @@ export declare class AnalyticsController {
     getHeatmap: (req: Request, res: Response, next: NextFunction) => Promise<void>;
     freezeSnapshot: (req: Request, res: Response, next: NextFunction) => Promise<void>;
     getKeyDrivers: (req: Request, res: Response, next: NextFunction) => Promise<void>;
+    getDemographicOptions: (req: Request, res: Response, next: NextFunction) => Promise<void>;
 }

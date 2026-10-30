@@ -16,6 +16,7 @@ const SurveyResponseSchema = new mongoose_1.Schema({
     },
     responseToken: { type: String, index: true },
     nodeId: { type: String },
+    matrixNodeIds: [{ type: String }],
     demographicSnapshot: { type: mongoose_1.Schema.Types.Mixed },
     answers: [
         {

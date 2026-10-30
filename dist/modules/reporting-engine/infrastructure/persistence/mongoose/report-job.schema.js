@@ -14,6 +14,7 @@ const ReportJobSchema = new mongoose_1.Schema({
             'RAW_RESPONSES_XLSX',
             'AGGREGATED_SCORES_XLSX',
             'BOARDROOM_DECK_POWERPOINT',
+            'AGENTIC_PROMPT_PACK',
             'SCOPED_REPORT',
         ],
         required: true,

@@ -31,8 +31,8 @@ function createResponseIntakeRouter(responseRepo, tokenBurnUseCase, surveyRepo, 
     router.get('/responses/instrument', controller.getSurveyInstrument);
     router.post('/responses', controller.submitResponse);
     // Protected Administration & Analytics Routes
-    router.get('/responses', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([auth_middleware_1.UserRole.SUPER_ADMIN, auth_middleware_1.UserRole.PROJECT_ADMIN, auth_middleware_1.UserRole.CONSULTANT_DAASH, auth_middleware_1.UserRole.ORG_ADMIN, auth_middleware_1.UserRole.HR_MANAGER, auth_middleware_1.UserRole.REPORT_VIEWER]), controller.listResponses);
-    router.get('/responses/:responseId', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([auth_middleware_1.UserRole.SUPER_ADMIN, auth_middleware_1.UserRole.PROJECT_ADMIN, auth_middleware_1.UserRole.CONSULTANT_DAASH, auth_middleware_1.UserRole.ORG_ADMIN, auth_middleware_1.UserRole.HR_MANAGER, auth_middleware_1.UserRole.REPORT_VIEWER]), controller.getResponse);
+    router.get('/responses', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([auth_middleware_1.UserRole.SUPER_ADMIN, auth_middleware_1.UserRole.PROJECT_ADMIN, auth_middleware_1.UserRole.CONSULTANT_DAASH, auth_middleware_1.UserRole.CONSULTANT, auth_middleware_1.UserRole.ORG_ADMIN, auth_middleware_1.UserRole.HR_MANAGER, auth_middleware_1.UserRole.REPORT_VIEWER]), controller.listResponses);
+    router.get('/responses/:responseId', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([auth_middleware_1.UserRole.SUPER_ADMIN, auth_middleware_1.UserRole.PROJECT_ADMIN, auth_middleware_1.UserRole.CONSULTANT_DAASH, auth_middleware_1.UserRole.CONSULTANT, auth_middleware_1.UserRole.ORG_ADMIN, auth_middleware_1.UserRole.HR_MANAGER, auth_middleware_1.UserRole.REPORT_VIEWER]), controller.getResponse);
     return router;
 }
 //# sourceMappingURL=response.routes.js.map

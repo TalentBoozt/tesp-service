@@ -2,8 +2,10 @@ import { ScopedMetricSummary } from '../services/scoped-data-aggregator.service'
 import { ReportScopeType, IReportScopeFilter } from '../../domain/entities/scoped-report.entity';
 export interface ReportBrandingOptions {
     primaryColor?: string;
+    secondaryColor?: string;
     logoUrl?: string;
     organizationName?: string;
+    consultantFirmName?: string;
 }
 export interface GeneratePdfOptions {
     reportId: string;

@@ -107,7 +107,7 @@ function createAuthRouter() {
         }
     });
     // 3. User Invitation (Authenticated, Role-Guarded)
-    router.post('/invite', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([auth_middleware_1.UserRole.SUPER_ADMIN, auth_middleware_1.UserRole.PROJECT_ADMIN, auth_middleware_1.UserRole.CONSULTANT_DAASH]), async (req, res) => {
+    router.post('/invite', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([auth_middleware_1.UserRole.SUPER_ADMIN, auth_middleware_1.UserRole.PROJECT_ADMIN, auth_middleware_1.UserRole.CONSULTANT_DAASH, auth_middleware_1.UserRole.CONSULTANT]), async (req, res) => {
         try {
             const { email, firstName, lastName, role, projectId, firmId } = req.body || {};
             const result = await inviteUserUseCase.execute({
@@ -175,6 +175,11 @@ function createAuthRouter() {
             userId: req.user?.userId,
             role: req.user?.role,
             projectId: req.user?.projectId,
+            firmId: req.user?.firmId,
+            firmName: req.user?.firmName,
+            name: req.user?.name,
+            email: req.user?.email,
+            authorizedProjectIds: req.user?.authorizedProjectIds,
         });
     });
     // 7. Seed / Re-sync Default Accounts (Utility)

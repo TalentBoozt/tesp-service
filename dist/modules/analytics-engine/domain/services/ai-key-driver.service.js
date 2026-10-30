@@ -3,23 +3,34 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.AiKeyDriverService = void 0;
 class AiKeyDriverService {
     formatThemeName(groupId) {
-        const clean = groupId.replace(/^GRP-/, '').toLowerCase();
+        const clean = groupId.replace(/^GRP-/, '').toLowerCase().replace(/-/g, '_');
         const labelMap = {
             leadership: 'Leadership & Vision',
             leadership_trust: 'Leadership & Vision Trust',
+            leadership_management: 'Leadership & Management',
             culture: 'Workplace Culture',
+            culture_values: 'Company Culture & Values',
             workplace_culture: 'Workplace Inclusion & Safety',
             growth: 'Career Growth',
             growth_learning: 'Career Growth & Development',
+            career_development: 'Learning & Career Development',
             manager: 'Manager Support',
             manager_support: 'Managerial Effectiveness & Coaching',
             safety: 'Psychological Safety',
             psychological_safety: 'Psychological Safety & Openness',
             compensation: 'Compensation & Recognition',
             compensation_fairness: 'Compensation & Recognition',
+            communication: 'Communication & Teamwork',
+            communication_teamwork: 'Communication & Teamwork',
+            wellbeing: 'Employee Well-being & Inclusion',
+            wellbeing_inclusion: 'Employee Well-being & Inclusion',
+            workplace_satisfaction: 'Workplace Satisfaction',
+            satisfaction: 'Workplace Satisfaction',
+            overall_engagement: 'Overall Employee Engagement',
             enps: 'Employee Net Promoter Score (eNPS)',
         };
         return (labelMap[clean] ||
+            labelMap[clean.replace(/s$/, '')] ||
             groupId
                 .replace(/^GRP-/, '')
                 .replace(/_/g, ' ')
@@ -126,7 +137,33 @@ class AiKeyDriverService {
                             detected.add(g.toLowerCase());
                         }
                         else if (ans.questionId) {
-                            detected.add(ans.questionId);
+                            const qId = ans.questionId.toLowerCase();
+                            if (qId.startsWith('grp-')) {
+                                const parts = qId.split('-');
+                                detected.add(parts[1] || qId);
+                            }
+                            else if (qId.startsWith('q-')) {
+                                const parts = qId.split('-');
+                                const prefix = parts[1] || '';
+                                const prefixMap = {
+                                    sat: 'workplace_satisfaction',
+                                    cul: 'culture_values',
+                                    ldr: 'leadership_management',
+                                    com: 'communication_teamwork',
+                                    dev: 'career_development',
+                                    wel: 'wellbeing_inclusion',
+                                    eng: 'overall_engagement',
+                                };
+                                if (prefixMap[prefix]) {
+                                    detected.add(prefixMap[prefix]);
+                                }
+                                else if (prefix !== 'dem' && prefix !== 'opn') {
+                                    detected.add(prefix);
+                                }
+                            }
+                            else {
+                                detected.add(ans.questionId);
+                            }
                         }
                     }
                 }
@@ -188,9 +225,27 @@ class AiKeyDriverService {
                     const matchingAnswers = row.answers
                         .filter((a) => {
                         const qId = (a.questionId || '').toLowerCase();
-                        const groupId = (a.groupId || '').toLowerCase();
+                        const groupId = (a.groupId || a.category || '').toLowerCase();
                         const dimLower = dim.toLowerCase();
-                        return qId.includes(dimLower) || groupId.includes(dimLower);
+                        if (groupId && (groupId === dimLower || groupId.includes(dimLower) || dimLower.includes(groupId)))
+                            return true;
+                        if (qId.includes(dimLower))
+                            return true;
+                        if (dimLower === 'workplace_satisfaction' && qId.includes('-sat-'))
+                            return true;
+                        if (dimLower === 'culture_values' && qId.includes('-cul-'))
+                            return true;
+                        if (dimLower === 'leadership_management' && qId.includes('-ldr-'))
+                            return true;
+                        if (dimLower === 'communication_teamwork' && qId.includes('-com-'))
+                            return true;
+                        if (dimLower === 'career_development' && qId.includes('-dev-'))
+                            return true;
+                        if (dimLower === 'wellbeing_inclusion' && qId.includes('-wel-'))
+                            return true;
+                        if (dimLower === 'overall_engagement' && qId.includes('-eng-'))
+                            return true;
+                        return false;
                     })
                         .map((a) => a.numericValue)
                         .filter((v) => typeof v === 'number' && !isNaN(v));

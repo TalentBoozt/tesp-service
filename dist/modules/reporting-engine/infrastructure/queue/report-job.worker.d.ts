@@ -6,6 +6,7 @@ import { CsvReportGenerator } from '../generators/csv-report.generator';
 import { PdfReportGenerator } from '../generators/pdf-report.generator';
 import { ExcelReportGenerator } from '../generators/excel-report.generator';
 import { PptReportGenerator } from '../generators/ppt-report.generator';
+import { PromptReportGenerator } from '../generators/prompt-report.generator';
 export declare class ReportJobWorker {
     private queue;
     private reportJobRepo;
@@ -17,6 +18,7 @@ export declare class ReportJobWorker {
     pdfGenerator: PdfReportGenerator;
     excelGenerator: ExcelReportGenerator;
     pptGenerator: PptReportGenerator;
+    promptGenerator: PromptReportGenerator;
     constructor(queue: IReportJobQueue, reportJobRepo: IReportJobRepository, eventBus?: IEventBus, storageService?: IStorageService);
     static getInstance(reportJobRepo: IReportJobRepository, eventBus?: IEventBus, queue?: IReportJobQueue, storageService?: IStorageService): ReportJobWorker;
     triggerProcessing(): void;

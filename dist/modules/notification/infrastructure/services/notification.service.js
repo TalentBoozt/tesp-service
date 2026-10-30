@@ -16,7 +16,7 @@ class NotificationService {
         this.repo = repo;
     }
     generateId(projectId) {
-        const cleanProject = projectId.replace('PRJ-', '');
+        const cleanProject = projectId.replace(/^PRJ-?/i, '').replace(/[^A-Za-z0-9_]/g, '').substring(0, 14).toUpperCase() || 'SYS';
         const randomHex = Math.random().toString(36).substring(2, 8).toUpperCase();
         return `NTF-${cleanProject}-${randomHex}`;
     }
@@ -34,6 +34,7 @@ class NotificationService {
                             auth_middleware_1.UserRole.PROJECT_ADMIN,
                             auth_middleware_1.UserRole.SUPER_ADMIN,
                             auth_middleware_1.UserRole.ORG_ADMIN,
+                            auth_middleware_1.UserRole.CONSULTANT,
                             auth_middleware_1.UserRole.CONSULTANT_DAASH,
                         ],
                     },
@@ -65,35 +66,39 @@ class NotificationService {
         }
         return recipients;
     }
-    async createNotification(props) {
+    async createNotification(props, options) {
         const notificationId = this.generateId(props.projectId);
         const notification = new notification_entity_1.NotificationEntity({
             ...props,
             notificationId,
         });
         const saved = await this.repo.save(notification);
-        // If severity is CRITICAL, forward outbound email alert dynamically to verified tenant admins
-        if (saved.severity === 'CRITICAL') {
+        // If severity is CRITICAL or explicit dispatchEmail is requested, forward outbound alert
+        if (saved.severity === 'CRITICAL' || options?.dispatchEmail) {
             try {
                 const recipients = await this.resolveAlertRecipients(saved.projectId);
                 if (recipients.length > 0) {
                     const frontendBaseUrl = (process.env.APP_FRONTEND_URL || 'https://app.talnova.com').replace(/\/$/, '');
                     const actionFullUrl = `${frontendBaseUrl}${saved.actionUrl || '/dashboard'}`;
+                    const isCritical = saved.severity === 'CRITICAL';
+                    const headerColor = isCritical ? '#dc2626' : '#2563eb';
+                    const bgHeader = isCritical ? '#fff5f5' : '#f8fafc';
+                    const borderHeader = isCritical ? '#fee2e2' : '#e2e8f0';
                     await email_gateway_service_1.emailGatewayService.dispatch({
                         projectId: saved.projectId,
                         to: recipients,
-                        subject: `[CRITICAL ALERT] ${saved.title}`,
+                        subject: options?.emailSubject || `${isCritical ? '[CRITICAL ALERT] ' : '[NOTIFICATION] '}${saved.title}`,
                         htmlBody: `
-              <div style="font-family: sans-serif; padding: 20px; color: #1e293b; max-width: 600px; border: 1px solid #fee2e2; border-radius: 12px; background: #fff5f5;">
-                <h3 style="color: #dc2626; margin-top: 0;">CRITICAL PLATFORM EVENT: ${saved.title}</h3>
+              <div style="font-family: sans-serif; padding: 20px; color: #1e293b; max-width: 600px; border: 1px solid ${borderHeader}; border-radius: 12px; background: ${bgHeader};">
+                <h3 style="color: ${headerColor}; margin-top: 0;">${saved.title}</h3>
                 <p style="font-size: 14px; line-height: 1.5;">${saved.message}</p>
                 <div style="margin: 20px 0;">
-                  <a href="${actionFullUrl}" style="background-color: #dc2626; color: white; padding: 10px 20px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 13px; display: inline-block;">
-                    Investigate Root Cause
+                  <a href="${actionFullUrl}" style="background-color: ${headerColor}; color: white; padding: 10px 20px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 13px; display: inline-block;">
+                    View in Talnova Platform
                   </a>
                 </div>
                 <p style="font-size: 11px; color: #64748b; margin-bottom: 0;">
-                  Tenant Context: ${saved.projectId} &bull; Category: ${saved.category}
+                  Tenant: ${saved.projectId} &bull; Category: ${saved.category} &bull; Severity: ${saved.severity}
                 </p>
               </div>
             `,
@@ -108,10 +113,81 @@ class NotificationService {
         }
         return saved;
     }
+    async notifyTenantProvisioned(projectId, tenantName, clientName, tier) {
+        return this.createNotification({
+            projectId,
+            category: 'ORGANIZATION',
+            severity: 'SUCCESS',
+            title: `New Organization Provisioned: ${tenantName}`,
+            message: `Tenant "${tenantName}" (${projectId}) has been successfully provisioned on tier ${tier || 'ENTERPRISE'}. Ready for hierarchy configuration and campaign deployment.`,
+            actionUrl: `/admin/tenants`,
+            metadata: { projectId, tenantName, clientName, tier },
+        }, { dispatchEmail: false });
+    }
+    async notifyOrgNodeCreated(projectId, nodeName, nodeType, parentNodeId) {
+        return this.createNotification({
+            projectId,
+            category: 'ORGANIZATION',
+            severity: 'INFO',
+            title: `Organization Unit Added: ${nodeName}`,
+            message: `Unit "${nodeName}" (${nodeType}) was added to organizational structure.`,
+            actionUrl: '/organization',
+            metadata: { nodeName, nodeType, parentNodeId },
+        });
+    }
+    async notifySurveyResponseSubmitted(projectId, surveyId, campaignId, respondentCount) {
+        const countText = respondentCount !== undefined ? ` (Total responses: ${respondentCount})` : '';
+        return this.createNotification({
+            projectId,
+            category: 'CAMPAIGN',
+            severity: 'INFO',
+            title: 'Survey Response Intake Recorded',
+            message: `A validated survey response was received for survey "${surveyId}"${campaignId ? ` under campaign "${campaignId}"` : ''}.${countText}`,
+            actionUrl: `/campaigns`,
+            metadata: { surveyId, campaignId, respondentCount },
+        });
+    }
+    async notifyCampaignLaunched(projectId, campaignId, campaignTitle, totalTargeted) {
+        const targetText = totalTargeted ? ` targeting ${totalTargeted} respondents` : '';
+        return this.createNotification({
+            projectId,
+            recipientRole: auth_middleware_1.UserRole.ORG_ADMIN,
+            category: 'CAMPAIGN',
+            severity: 'SUCCESS',
+            title: `Campaign Launched: ${campaignTitle}`,
+            message: `Survey campaign "${campaignTitle}" has officially launched${targetText}. Live telemetry and intake is active.`,
+            actionUrl: '/campaigns',
+            metadata: { campaignId, campaignTitle, totalTargeted },
+        });
+    }
+    async notifySurveyPublished(projectId, surveyId, surveyTitle, version) {
+        const vText = version ? ` (v${version})` : '';
+        return this.createNotification({
+            projectId,
+            category: 'CAMPAIGN',
+            severity: 'SUCCESS',
+            title: `Survey Published: ${surveyTitle}`,
+            message: `Survey instrument "${surveyTitle}"${vText} is approved, sealed, and ready for campaign distribution.`,
+            actionUrl: '/surveys',
+            metadata: { surveyId, surveyTitle, version },
+        });
+    }
+    async notifyExecutiveWorkshopCreated(projectId, workshopTitle, consultantLead) {
+        return this.createNotification({
+            projectId,
+            recipientRole: auth_middleware_1.UserRole.CONSULTANT,
+            category: 'CAMPAIGN',
+            severity: 'INFO',
+            title: `Executive Workshop Scheduled: ${workshopTitle}`,
+            message: `Strategy debrief workshop "${workshopTitle}" has been scheduled with facilitator ${consultantLead || 'Consultant'}.`,
+            actionUrl: '/consultant/workshops',
+            metadata: { workshopTitle, consultantLead },
+        });
+    }
     async notifySentimentAnomaly(projectId, nodeName, dropPercent, actionUrl = '/ai-analytics') {
         return this.createNotification({
             projectId,
-            recipientRole: auth_middleware_1.UserRole.CONSULTANT_DAASH,
+            recipientRole: auth_middleware_1.UserRole.CONSULTANT,
             category: 'AI_ANOMALY',
             severity: 'CRITICAL',
             title: `AI Sentiment Anomaly Detected in ${nodeName}`,

@@ -105,8 +105,9 @@ const ProjectSchema = new mongoose_1.Schema({
             allowedValues: [{ type: String }],
         },
     ],
-    tenantId: { type: String, default: 'TENANT-DAASH', index: true },
-    tenantName: { type: String, default: 'Daash Global Advisory' },
+    tenantId: { type: String, index: true },
+    tenantName: { type: String, required: false },
+    consultantFirmId: { type: String, required: false, index: true },
     clientOrgName: { type: String },
     tier: {
         type: String,
