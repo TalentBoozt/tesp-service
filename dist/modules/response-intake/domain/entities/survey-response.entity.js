@@ -11,6 +11,7 @@ class SurveyResponseEntity {
     respondentType;
     responseToken;
     nodeId;
+    matrixNodeIds;
     demographicSnapshot;
     answers;
     submittedAt;
@@ -31,6 +32,7 @@ class SurveyResponseEntity {
         this.respondentType = props.respondentType;
         this.responseToken = props.responseToken;
         this.nodeId = props.nodeId;
+        this.matrixNodeIds = Array.isArray(props.matrixNodeIds) ? [...props.matrixNodeIds] : [];
         this.demographicSnapshot = props.demographicSnapshot ? { ...props.demographicSnapshot } : {};
         this.answers = props.answers.map((a) => (a instanceof answer_value_object_1.AnswerValueObject ? a : new answer_value_object_1.AnswerValueObject(a)));
         this.submittedAt = props.submittedAt || new Date();
@@ -52,6 +54,7 @@ class SurveyResponseEntity {
             respondentType: this.respondentType,
             responseToken: this.responseToken,
             nodeId: this.nodeId,
+            matrixNodeIds: [...this.matrixNodeIds],
             demographicSnapshot: { ...this.demographicSnapshot },
             answers: this.answers.map((a) => a.toJSON()),
             submittedAt: this.submittedAt,

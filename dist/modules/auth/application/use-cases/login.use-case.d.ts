@@ -21,6 +21,7 @@ export interface ILoginResponse {
         projectId: string;
         authorizedProjectIds: string[];
         firmId?: string;
+        firmName?: string;
         mustChangePassword: boolean;
         employeeId?: string;
         phoneNumber?: string;

@@ -28,22 +28,32 @@ function createAiAnalyticsRouter(aiInsightRepo, responseRepo, aiProvider, projec
     const knowledgeEngineUseCase = new knowledge_engine_use_case_1.KnowledgeEngineUseCase();
     const controller = new ai_analytics_controller_1.AiAnalyticsController(analyzeTextResponsesUseCase, getExecutiveSummaryUseCase, overrideSentimentUseCase, getRiskAlertsUseCase, aiCopilotUseCase, knowledgeEngineUseCase);
     router.use('/ai', auth_middleware_1.authenticate);
-    router.post('/ai/analyze', (0, auth_middleware_1.authorize)([auth_middleware_1.UserRole.SUPER_ADMIN, auth_middleware_1.UserRole.PROJECT_ADMIN, auth_middleware_1.UserRole.CONSULTANT_DAASH]), controller.analyzeCampaign);
+    router.post('/ai/analyze', (0, auth_middleware_1.authorize)([auth_middleware_1.UserRole.SUPER_ADMIN, auth_middleware_1.UserRole.PROJECT_ADMIN, auth_middleware_1.UserRole.CONSULTANT_DAASH, auth_middleware_1.UserRole.CONSULTANT]), controller.analyzeCampaign);
     router.get('/ai/summaries', (0, auth_middleware_1.authorize)([
+        auth_middleware_1.UserRole.SUPER_ADMIN,
+        auth_middleware_1.UserRole.PROJECT_ADMIN,
+        auth_middleware_1.UserRole.CONSULTANT_DAASH,
+        auth_middleware_1.UserRole.CONSULTANT,
+        auth_middleware_1.UserRole.ORG_ADMIN,
+        auth_middleware_1.UserRole.HR_MANAGER,
+        auth_middleware_1.UserRole.DEPARTMENT_MANAGER,
+        auth_middleware_1.UserRole.REPORT_VIEWER,
+    ]), controller.getSummary);
+    router.put('/ai/insights/:insightId/override', (0, auth_middleware_1.authorize)([auth_middleware_1.UserRole.SUPER_ADMIN, auth_middleware_1.UserRole.PROJECT_ADMIN, auth_middleware_1.UserRole.CONSULTANT_DAASH, auth_middleware_1.UserRole.ORG_ADMIN, auth_middleware_1.UserRole.HR_MANAGER]), controller.overrideSentiment);
+    router.get('/ai/risk-alerts', (0, auth_middleware_1.authorize)([
         auth_middleware_1.UserRole.SUPER_ADMIN,
         auth_middleware_1.UserRole.PROJECT_ADMIN,
         auth_middleware_1.UserRole.CONSULTANT_DAASH,
         auth_middleware_1.UserRole.ORG_ADMIN,
         auth_middleware_1.UserRole.HR_MANAGER,
-        auth_middleware_1.UserRole.REPORT_VIEWER,
-    ]), controller.getSummary);
-    router.put('/ai/insights/:insightId/override', (0, auth_middleware_1.authorize)([auth_middleware_1.UserRole.SUPER_ADMIN, auth_middleware_1.UserRole.PROJECT_ADMIN, auth_middleware_1.UserRole.CONSULTANT_DAASH, auth_middleware_1.UserRole.ORG_ADMIN, auth_middleware_1.UserRole.HR_MANAGER]), controller.overrideSentiment);
-    router.get('/ai/risk-alerts', (0, auth_middleware_1.authorize)([auth_middleware_1.UserRole.SUPER_ADMIN, auth_middleware_1.UserRole.PROJECT_ADMIN, auth_middleware_1.UserRole.CONSULTANT_DAASH, auth_middleware_1.UserRole.ORG_ADMIN, auth_middleware_1.UserRole.HR_MANAGER]), controller.getRiskAlerts);
+        auth_middleware_1.UserRole.DEPARTMENT_MANAGER,
+    ]), controller.getRiskAlerts);
     // FEAT-017: AI Copilot Natural Language Assistant Route
     router.post('/ai/copilot/chat', (0, auth_middleware_1.authorize)([
         auth_middleware_1.UserRole.SUPER_ADMIN,
         auth_middleware_1.UserRole.PROJECT_ADMIN,
         auth_middleware_1.UserRole.CONSULTANT_DAASH,
+        auth_middleware_1.UserRole.CONSULTANT,
         auth_middleware_1.UserRole.ORG_ADMIN,
         auth_middleware_1.UserRole.HR_MANAGER,
         auth_middleware_1.UserRole.DEPARTMENT_MANAGER,
@@ -55,6 +65,7 @@ function createAiAnalyticsRouter(aiInsightRepo, responseRepo, aiProvider, projec
         auth_middleware_1.UserRole.SUPER_ADMIN,
         auth_middleware_1.UserRole.PROJECT_ADMIN,
         auth_middleware_1.UserRole.CONSULTANT_DAASH,
+        auth_middleware_1.UserRole.CONSULTANT,
         auth_middleware_1.UserRole.ORG_ADMIN,
         auth_middleware_1.UserRole.HR_MANAGER,
         auth_middleware_1.UserRole.DEPARTMENT_MANAGER,

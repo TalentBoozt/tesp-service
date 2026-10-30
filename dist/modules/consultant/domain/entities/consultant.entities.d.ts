@@ -2,6 +2,7 @@ export type EngagementStage = 'DIAGNOSTIC' | 'FIELDWORK' | 'AI_SYNTHESIS' | 'EXE
 export type EngagementHealth = 'OPTIMAL' | 'ATTENTION' | 'CRITICAL';
 export interface ClientEngagementProps {
     id: string;
+    firmId?: string;
     projectId: string;
     clientName: string;
     clientCode: string;
@@ -19,6 +20,7 @@ export interface ClientEngagementProps {
 }
 export declare class ClientEngagementEntity {
     id: string;
+    firmId?: string;
     projectId: string;
     clientName: string;
     clientCode: string;
@@ -38,6 +40,7 @@ export declare class ClientEngagementEntity {
 }
 export interface IndustryBenchmarkProps {
     id: string;
+    firmId?: string;
     metricKey: string;
     metricName: string;
     sector: string;
@@ -51,6 +54,7 @@ export interface IndustryBenchmarkProps {
 }
 export declare class IndustryBenchmarkEntity {
     id: string;
+    firmId: string;
     metricKey: string;
     metricName: string;
     sector: string;
@@ -64,6 +68,7 @@ export declare class IndustryBenchmarkEntity {
     constructor(props: IndustryBenchmarkProps);
     toJSON(): {
         id: string;
+        firmId: string;
         metricKey: string;
         metricName: string;
         sector: string;
@@ -79,6 +84,7 @@ export declare class IndustryBenchmarkEntity {
 export type WorkshopStatus = 'DRAFT' | 'READY_FOR_EXEC' | 'DELIVERED';
 export interface ExecutiveWorkshopProps {
     id: string;
+    firmId?: string;
     projectId: string;
     title: string;
     clientName: string;
@@ -93,6 +99,7 @@ export interface ExecutiveWorkshopProps {
 }
 export declare class ExecutiveWorkshopEntity {
     id: string;
+    firmId?: string;
     projectId: string;
     title: string;
     clientName: string;
@@ -110,6 +117,7 @@ export declare class ExecutiveWorkshopEntity {
 export type RiskSeverity = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
 export interface AiSignoffProps {
     id: string;
+    firmId?: string;
     projectId: string;
     surveyTitle: string;
     aiGeneratedInsight: string;
@@ -124,6 +132,7 @@ export interface AiSignoffProps {
 }
 export declare class AiSignoffEntity {
     id: string;
+    firmId?: string;
     projectId: string;
     surveyTitle: string;
     aiGeneratedInsight: string;

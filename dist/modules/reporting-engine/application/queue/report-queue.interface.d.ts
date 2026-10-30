@@ -6,7 +6,7 @@ export interface ReportJobPayload {
     projectId: string;
     campaignId: string;
     reportType: ReportType;
-    format?: 'PDF' | 'EXCEL' | 'POWERPOINT' | 'CSV' | 'WEB';
+    format?: 'PDF' | 'EXCEL' | 'POWERPOINT' | 'PROMPT' | 'CSV' | 'WEB';
     nodeId?: string;
     scopeType?: ReportScopeType;
     scopeFilter?: IReportScopeFilter;

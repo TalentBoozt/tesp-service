@@ -9,6 +9,7 @@ export interface ISurveyResponseDocument extends Document {
     respondentType: AnonymityLevel;
     responseToken?: string;
     nodeId?: string;
+    matrixNodeIds?: string[];
     demographicSnapshot?: Record<string, any>;
     answers: {
         questionId: string;

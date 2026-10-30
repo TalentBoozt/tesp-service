@@ -43,9 +43,28 @@ const mongoose_1 = __importDefault(require("mongoose"));
 const org_node_schema_1 = require("../../../organization/infrastructure/persistence/mongoose/org-node.schema");
 const DIMENSION_LABEL_MAP = {
     leadership_trust: 'Leadership & Vision Trust',
+    leadership_management: 'Leadership & Management',
+    leadership: 'Leadership & Vision Trust',
     enps: 'Employee Net Promoter Score (eNPS)',
     workplace_culture: 'Workplace Inclusion & Safety',
+    culture_values: 'Company Culture & Values',
+    culture: 'Workplace Culture & Values',
     growth_learning: 'Career Growth & Development',
+    career_development: 'Learning & Career Development',
+    growth: 'Career Growth & Development',
+    manager_support: 'Managerial Effectiveness & Coaching',
+    communication_teamwork: 'Communication & Teamwork',
+    communication: 'Communication & Teamwork',
+    psychological_safety: 'Psychological Safety & Openness',
+    compensation_fairness: 'Compensation & Recognition',
+    compensation: 'Compensation & Recognition',
+    wellbeing_inclusion: 'Employee Well-being & Inclusion',
+    wellbeing: 'Employee Well-being & Inclusion',
+    workplace_satisfaction: 'Workplace Satisfaction',
+    satisfaction: 'Workplace Satisfaction',
+    overall_engagement: 'Overall Employee Engagement',
+    engagement: 'Overall Employee Engagement',
+    demographics: 'Employee Demographics',
 };
 class GetHeatmapMatrixUseCase {
     responseRepo;
@@ -56,10 +75,13 @@ class GetHeatmapMatrixUseCase {
         this.privacyGuard = new privacy_guard_service_1.PrivacyGuardService();
         this.engagementCalculator = new engagement_index_calculator_1.EngagementIndexCalculatorService();
     }
-    async execute(projectId, campaignId, parentNodeId, bypassPrivacy = false) {
+    async execute(projectId, campaignId, parentNodeId, bypassPrivacy = false, demographicFilters) {
         // 1. Fetch all registered org nodes for this project
         const orgNodes = mongoose_1.default.connection.readyState === 1
-            ? await org_node_schema_1.OrgNodeModel.find({ projectId, isDeleted: { $ne: true } }).lean()
+            ? await org_node_schema_1.OrgNodeModel.find({
+                $or: [{ projectId }, { projectId: { $exists: true } }],
+                isDeleted: { $ne: true },
+            }).lean()
             : [];
         const orgNodeMap = new Map(orgNodes.map((n) => [n.nodeId || n.nodeCode, n.name]));
         // 2. Map question taxonomy from Survey AST (GAP-017 / GAP-011)
@@ -75,13 +97,13 @@ class GetHeatmapMatrixUseCase {
                     }
                     if (campaign.surveyId) {
                         const { SurveyModel } = await Promise.resolve().then(() => __importStar(require('../../../survey/infrastructure/persistence/mongoose/survey.schema')));
-                        const survey = await SurveyModel.findOne({ projectId, surveyId: campaign.surveyId }).lean();
+                        const survey = await SurveyModel.findOne({ $or: [{ projectId, surveyId: campaign.surveyId }, { surveyId: campaign.surveyId }] }).lean();
                         if (survey?.pages) {
                             for (const page of survey.pages) {
                                 for (const sec of (page.sections || [])) {
                                     for (const q of (sec.questions || [])) {
-                                        const rawCat = q.category || q.groupId || q.metadata?.driver;
-                                        const cat = (rawCat || (q.type === 'NPS' ? 'enps' : 'general'))
+                                        const rawCat = q.category || q.groupId || sec.groupId || q.metadata?.driver;
+                                        const cat = String(rawCat || (q.type === 'NPS' ? 'enps' : 'general'))
                                             .toLowerCase()
                                             .replace(/-/g, '_');
                                         questionCategoryMap.set(q.questionId, cat);
@@ -99,6 +121,86 @@ class GetHeatmapMatrixUseCase {
         }
         // 3. Fetch survey responses for this campaign
         const { responses } = await this.responseRepo.findAllByCampaign(projectId, campaignId, { limit: 10000 });
+        // Helper to map response to all its assigned nodes (primary, matrix, demographic department, ancestors)
+        const resolveNodesForResponse = (r) => {
+            const assigned = new Set();
+            if (r.nodeId)
+                assigned.add(r.nodeId);
+            const matrix = [
+                ...(Array.isArray(r.matrixNodeIds) ? r.matrixNodeIds : []),
+                ...(Array.isArray(r.demographicSnapshot?.matrixNodeIds) ? r.demographicSnapshot.matrixNodeIds : []),
+                ...(Array.isArray(r.demographicSnapshot?.secondaryNodeIds) ? r.demographicSnapshot.secondaryNodeIds : []),
+            ];
+            for (const m of matrix) {
+                if (m)
+                    assigned.add(m);
+            }
+            // Check demographic department matching org nodes
+            const snap = r.demographicSnapshot || {};
+            const deptVal = snap.Department || snap.department || snap.Dept || snap.dept;
+            if (typeof deptVal === 'string' && deptVal.trim().length > 0 && isNaN(Number(deptVal))) {
+                const cleanDept = deptVal.trim().toLowerCase();
+                for (const n of orgNodes) {
+                    const nName = (n.name || '').toLowerCase();
+                    const nCode = n.nodeId || n.nodeCode;
+                    if (nCode && (nName === cleanDept || nCode.toLowerCase() === cleanDept)) {
+                        assigned.add(nCode);
+                    }
+                }
+            }
+            // Add ancestor nodes up the tree
+            const toCheck = Array.from(assigned);
+            for (const code of toCheck) {
+                let curr = orgNodes.find((n) => (n.nodeId || n.nodeCode) === code);
+                while (curr && curr.parentId) {
+                    assigned.add(curr.parentId);
+                    const parentId = curr.parentId;
+                    curr = orgNodes.find((n) => (n.nodeId || n.nodeCode) === parentId);
+                }
+            }
+            if (assigned.size === 0) {
+                assigned.add('GLOBAL');
+            }
+            return assigned;
+        };
+        // Filter responses by parentNodeId and demographicFilters
+        const filteredResponses = responses.filter((r) => {
+            if (r.isDeleted)
+                return false;
+            if (parentNodeId && parentNodeId !== 'ALL' && parentNodeId !== 'GLOBAL') {
+                const respNodes = resolveNodesForResponse(r);
+                if (!respNodes.has(parentNodeId))
+                    return false;
+            }
+            if (demographicFilters) {
+                for (const [key, val] of Object.entries(demographicFilters)) {
+                    if (val && val !== 'ALL') {
+                        const keyClean = key.toLowerCase().replace(/[\s_-]/g, '');
+                        const demo = r.demographicSnapshot || {};
+                        let actualVal = undefined;
+                        for (const [dk, dv] of Object.entries(demo)) {
+                            if (dk.toLowerCase().replace(/[\s_-]/g, '') === keyClean) {
+                                actualVal = dv;
+                                break;
+                            }
+                        }
+                        if (actualVal === undefined && Array.isArray(r.answers)) {
+                            const matchedAns = r.answers.find((a) => (a.textValue && String(a.textValue).trim().toLowerCase() === String(val).trim().toLowerCase()) ||
+                                (Array.isArray(a.selectedOptions) && a.selectedOptions.some((opt) => String(opt).trim().toLowerCase() === String(val).trim().toLowerCase())) ||
+                                (Array.isArray(a.choiceValues) && a.choiceValues.some((opt) => String(opt).trim().toLowerCase() === String(val).trim().toLowerCase())));
+                            if (matchedAns)
+                                actualVal = val;
+                        }
+                        const valStr = String(val).trim().toLowerCase();
+                        const actStr = String(actualVal ?? '').trim().toLowerCase();
+                        if (actStr !== valStr && actualVal != val) {
+                            return false;
+                        }
+                    }
+                }
+            }
+            return true;
+        });
         const cellScoresMap = new Map(); // `${nodeCode}:${dimKey}`
         const activeNodesSet = new Set();
         const detectedCategoriesSet = new Set();
@@ -108,12 +210,12 @@ class GetHeatmapMatrixUseCase {
             if (code)
                 activeNodesSet.add(code);
         }
-        // Populate cell scores from actual responses
-        for (const r of responses) {
-            if (r.isDeleted)
-                continue;
-            const nodeCode = r.nodeId || 'GLOBAL';
-            activeNodesSet.add(nodeCode);
+        // Populate cell scores from actual filtered responses attributed to all assigned nodes
+        for (const r of filteredResponses) {
+            const assignedNodes = resolveNodesForResponse(r);
+            for (const nodeCode of assignedNodes) {
+                activeNodesSet.add(nodeCode);
+            }
             for (const ans of r.answers) {
                 if (ans.numericValue !== undefined && ans.numericValue !== null) {
                     const qType = (ans.questionType || '').toUpperCase();
@@ -137,15 +239,31 @@ class GetHeatmapMatrixUseCase {
                         const parts = ans.questionId.split('-');
                         dimKey = parts[1]?.toLowerCase().replace(/-/g, '_') || 'general';
                     }
+                    else if (ans.questionId.toLowerCase().startsWith('q-')) {
+                        const parts = ans.questionId.toLowerCase().split('-');
+                        const prefix = parts[1] || '';
+                        const prefixMap = {
+                            sat: 'workplace_satisfaction',
+                            cul: 'culture_values',
+                            ldr: 'leadership_management',
+                            com: 'communication_teamwork',
+                            dev: 'career_development',
+                            wel: 'wellbeing_inclusion',
+                            eng: 'overall_engagement',
+                        };
+                        dimKey = prefixMap[prefix] || (prefix !== 'dem' && prefix !== 'opn' ? prefix : 'general');
+                    }
                     else {
                         dimKey = 'general';
                     }
                     detectedCategoriesSet.add(dimKey);
-                    const key = `${nodeCode}:${dimKey}`;
-                    if (!cellScoresMap.has(key)) {
-                        cellScoresMap.set(key, []);
+                    for (const nodeCode of assignedNodes) {
+                        const key = `${nodeCode}:${dimKey}`;
+                        if (!cellScoresMap.has(key)) {
+                            cellScoresMap.set(key, []);
+                        }
+                        cellScoresMap.get(key).push(Number(ans.numericValue));
                     }
-                    cellScoresMap.get(key).push(Number(ans.numericValue));
                 }
             }
         }
@@ -164,6 +282,9 @@ class GetHeatmapMatrixUseCase {
         else {
             groups = ['leadership_trust', 'enps', 'workplace_culture', 'growth_learning'];
         }
+        // Filter out non-sentiment/qualitative categories
+        const excludeGroups = new Set(['demographics', 'qualitative_feedback']);
+        groups = groups.filter((g) => !excludeGroups.has(g.toLowerCase()));
         const cells = [];
         for (const nodeCode of nodes) {
             const nodeName = orgNodeMap.get(nodeCode) || nodeCode;

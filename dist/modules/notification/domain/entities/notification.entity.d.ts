@@ -1,5 +1,5 @@
 import { UserRole } from '../../../../shared/presentation/middleware/auth.middleware';
-export type NotificationCategory = 'CAMPAIGN' | 'AI_ANOMALY' | 'REPORT' | 'HRIS' | 'COMPLIANCE';
+export type NotificationCategory = 'CAMPAIGN' | 'AI_ANOMALY' | 'REPORT' | 'HRIS' | 'COMPLIANCE' | 'ORGANIZATION';
 export type NotificationSeverity = 'INFO' | 'SUCCESS' | 'WARNING' | 'CRITICAL';
 export interface INotificationProps {
     notificationId: string;

@@ -53,6 +53,7 @@ class SubmitSurveyResponseUseCase {
         const effectiveAnonymityLevel = campaignAnonymityLevel || dto.respondentType || campaign_entity_1.AnonymityLevel.SEMI_ANONYMOUS;
         // 1. Token Validation and Atomic Reservation (GAP-004: Atomic conditional state transition to eliminate TOCTOU race conditions)
         let tokenPayloadNodeId = dto.nodeId;
+        let tokenPayloadMatrixNodeIds = [];
         let tokenBurned = false;
         let cachedPayload = undefined;
         if (dto.responseToken && this.tokenBurnUseCase) {
@@ -63,6 +64,9 @@ class SubmitSurveyResponseUseCase {
             cachedPayload = tokenResult.payload;
             if (tokenResult.payload?.nodeId) {
                 tokenPayloadNodeId = tokenResult.payload.nodeId;
+            }
+            if (Array.isArray(tokenResult.payload?.matrixNodeIds)) {
+                tokenPayloadMatrixNodeIds = tokenResult.payload.matrixNodeIds;
             }
             // Atomic reservation: burn token now to prevent concurrent race condition duplicate submissions
             const reservation = await this.tokenBurnUseCase.burnToken(dto.responseToken);
@@ -168,7 +172,11 @@ class SubmitSurveyResponseUseCase {
                 respondentType: effectiveAnonymityLevel,
                 responseToken: dto.responseToken,
                 nodeId: tokenPayloadNodeId,
-                demographicSnapshot: sanitizedDemographicSnapshot,
+                matrixNodeIds: tokenPayloadMatrixNodeIds,
+                demographicSnapshot: {
+                    ...sanitizedDemographicSnapshot,
+                    ...(tokenPayloadMatrixNodeIds.length > 0 ? { matrixNodeIds: tokenPayloadMatrixNodeIds } : {}),
+                },
                 answers: sanitizedAnswers,
                 submittedAt: new Date(),
             };

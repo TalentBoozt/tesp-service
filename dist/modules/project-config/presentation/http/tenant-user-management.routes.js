@@ -17,9 +17,10 @@ const system_email_service_1 = require("../../../../shared/infrastructure/email/
 function createTenantUserManagementRouter() {
     const router = (0, express_1.Router)();
     const isCallerAuthorizedForProject = async (caller, targetProjectId, requireConsultantOrSuperAdmin = false) => {
-        if (caller.role === auth_middleware_1.UserRole.SUPER_ADMIN)
+        const effectiveRole = (0, auth_middleware_1.normalizeUserRole)(caller.role);
+        if (effectiveRole === auth_middleware_1.UserRole.SUPER_ADMIN)
             return true;
-        if (requireConsultantOrSuperAdmin && caller.role !== auth_middleware_1.UserRole.CONSULTANT_DAASH) {
+        if (requireConsultantOrSuperAdmin && effectiveRole !== auth_middleware_1.UserRole.CONSULTANT && effectiveRole !== auth_middleware_1.UserRole.CONSULTANT_DAASH) {
             return false;
         }
         if (caller.projectId === targetProjectId)
@@ -130,8 +131,10 @@ function createTenantUserManagementRouter() {
                 });
             }
             // Privilege Escalation Guard
-            const restrictedRoles = [auth_middleware_1.UserRole.SUPER_ADMIN, auth_middleware_1.UserRole.CONSULTANT_DAASH];
-            if (caller.role !== auth_middleware_1.UserRole.SUPER_ADMIN && restrictedRoles.includes(role)) {
+            const restrictedRoles = [auth_middleware_1.UserRole.SUPER_ADMIN, auth_middleware_1.UserRole.CONSULTANT, auth_middleware_1.UserRole.CONSULTANT_DAASH];
+            const callerRole = (0, auth_middleware_1.normalizeUserRole)(caller.role);
+            const targetRole = (0, auth_middleware_1.normalizeUserRole)(role);
+            if (callerRole !== auth_middleware_1.UserRole.SUPER_ADMIN && (restrictedRoles.includes(role) || targetRole === auth_middleware_1.UserRole.CONSULTANT || targetRole === auth_middleware_1.UserRole.SUPER_ADMIN)) {
                 return res.status(403).json({
                     type: 'https://tesp-api.talnova.io/errors/forbidden',
                     title: 'Privilege Escalation Prohibited',
@@ -257,8 +260,10 @@ function createTenantUserManagementRouter() {
                 });
             }
             // Privilege Escalation Guard
-            const restrictedRoles = [auth_middleware_1.UserRole.SUPER_ADMIN, auth_middleware_1.UserRole.CONSULTANT_DAASH];
-            if (caller.role !== auth_middleware_1.UserRole.SUPER_ADMIN && restrictedRoles.includes(role)) {
+            const restrictedRoles = [auth_middleware_1.UserRole.SUPER_ADMIN, auth_middleware_1.UserRole.CONSULTANT, auth_middleware_1.UserRole.CONSULTANT_DAASH];
+            const callerRole = (0, auth_middleware_1.normalizeUserRole)(caller.role);
+            const targetRole = (0, auth_middleware_1.normalizeUserRole)(role);
+            if (callerRole !== auth_middleware_1.UserRole.SUPER_ADMIN && (restrictedRoles.includes(role) || targetRole === auth_middleware_1.UserRole.CONSULTANT || targetRole === auth_middleware_1.UserRole.SUPER_ADMIN)) {
                 return res.status(403).json({
                     type: 'https://tesp-api.talnova.io/errors/forbidden',
                     title: 'Privilege Escalation Prohibited',

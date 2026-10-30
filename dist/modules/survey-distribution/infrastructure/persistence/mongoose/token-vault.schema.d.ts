@@ -7,6 +7,7 @@ export interface ITokenVaultDocument extends Document {
     channel?: string;
     employeeId?: string;
     nodeId?: string;
+    matrixNodeIds?: string[];
     isBurned: boolean;
     burnedAt?: Date;
     expiresAt?: Date;

@@ -6,6 +6,7 @@ export interface CachedTokenPayload {
     surveyVersion: number;
     anonymityLevel: string;
     nodeId?: string;
+    matrixNodeIds?: string[];
     employeeId?: string;
     expirationDate: string;
 }

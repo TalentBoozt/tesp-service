@@ -28,6 +28,7 @@ function createAnalyticsEngineRouter(snapshotRepo, responseRepo, redisAnalyticsR
         auth_middleware_1.UserRole.SUPER_ADMIN,
         auth_middleware_1.UserRole.PROJECT_ADMIN,
         auth_middleware_1.UserRole.CONSULTANT_DAASH,
+        auth_middleware_1.UserRole.CONSULTANT,
         auth_middleware_1.UserRole.ORG_ADMIN,
         auth_middleware_1.UserRole.HR_MANAGER,
         auth_middleware_1.UserRole.DEPARTMENT_MANAGER,
@@ -37,6 +38,7 @@ function createAnalyticsEngineRouter(snapshotRepo, responseRepo, redisAnalyticsR
         auth_middleware_1.UserRole.SUPER_ADMIN,
         auth_middleware_1.UserRole.PROJECT_ADMIN,
         auth_middleware_1.UserRole.CONSULTANT_DAASH,
+        auth_middleware_1.UserRole.CONSULTANT,
         auth_middleware_1.UserRole.ORG_ADMIN,
         auth_middleware_1.UserRole.HR_MANAGER,
         auth_middleware_1.UserRole.DEPARTMENT_MANAGER,
@@ -46,6 +48,7 @@ function createAnalyticsEngineRouter(snapshotRepo, responseRepo, redisAnalyticsR
         auth_middleware_1.UserRole.SUPER_ADMIN,
         auth_middleware_1.UserRole.PROJECT_ADMIN,
         auth_middleware_1.UserRole.CONSULTANT_DAASH,
+        auth_middleware_1.UserRole.CONSULTANT,
         auth_middleware_1.UserRole.ORG_ADMIN,
         auth_middleware_1.UserRole.HR_MANAGER,
         auth_middleware_1.UserRole.DEPARTMENT_MANAGER,
@@ -55,6 +58,7 @@ function createAnalyticsEngineRouter(snapshotRepo, responseRepo, redisAnalyticsR
         auth_middleware_1.UserRole.SUPER_ADMIN,
         auth_middleware_1.UserRole.PROJECT_ADMIN,
         auth_middleware_1.UserRole.CONSULTANT_DAASH,
+        auth_middleware_1.UserRole.CONSULTANT,
         auth_middleware_1.UserRole.ORG_ADMIN,
         auth_middleware_1.UserRole.HR_MANAGER,
         auth_middleware_1.UserRole.DEPARTMENT_MANAGER,
@@ -64,11 +68,23 @@ function createAnalyticsEngineRouter(snapshotRepo, responseRepo, redisAnalyticsR
         auth_middleware_1.UserRole.SUPER_ADMIN,
         auth_middleware_1.UserRole.PROJECT_ADMIN,
         auth_middleware_1.UserRole.CONSULTANT_DAASH,
+        auth_middleware_1.UserRole.CONSULTANT,
         auth_middleware_1.UserRole.ORG_ADMIN,
         auth_middleware_1.UserRole.HR_MANAGER,
+        auth_middleware_1.UserRole.DEPARTMENT_MANAGER,
         auth_middleware_1.UserRole.REPORT_VIEWER,
     ]), controller.getKeyDrivers);
-    router.post('/analytics/snapshots', (0, auth_middleware_1.authorize)([auth_middleware_1.UserRole.SUPER_ADMIN, auth_middleware_1.UserRole.PROJECT_ADMIN, auth_middleware_1.UserRole.CONSULTANT_DAASH, auth_middleware_1.UserRole.ORG_ADMIN]), controller.freezeSnapshot);
+    router.get('/analytics/demographic-options', (0, auth_middleware_1.authorize)([
+        auth_middleware_1.UserRole.SUPER_ADMIN,
+        auth_middleware_1.UserRole.PROJECT_ADMIN,
+        auth_middleware_1.UserRole.CONSULTANT_DAASH,
+        auth_middleware_1.UserRole.CONSULTANT,
+        auth_middleware_1.UserRole.ORG_ADMIN,
+        auth_middleware_1.UserRole.HR_MANAGER,
+        auth_middleware_1.UserRole.DEPARTMENT_MANAGER,
+        auth_middleware_1.UserRole.REPORT_VIEWER,
+    ]), controller.getDemographicOptions);
+    router.post('/analytics/snapshots', (0, auth_middleware_1.authorize)([auth_middleware_1.UserRole.SUPER_ADMIN, auth_middleware_1.UserRole.PROJECT_ADMIN, auth_middleware_1.UserRole.CONSULTANT_DAASH, auth_middleware_1.UserRole.CONSULTANT, auth_middleware_1.UserRole.ORG_ADMIN]), controller.freezeSnapshot);
     return router;
 }
 //# sourceMappingURL=analytics.routes.js.map

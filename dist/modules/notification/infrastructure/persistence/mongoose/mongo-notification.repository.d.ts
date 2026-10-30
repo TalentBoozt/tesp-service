@@ -7,6 +7,7 @@ export declare class MongoNotificationRepository implements INotificationReposit
     saveBatch(notifications: NotificationEntity[]): Promise<void>;
     findByNotificationId(notificationId: string): Promise<NotificationEntity | null>;
     private buildRecipientFilter;
+    private isGlobalScope;
     findTenantNotifications(query: FindNotificationsQuery): Promise<{
         notifications: NotificationEntity[];
         total: number;

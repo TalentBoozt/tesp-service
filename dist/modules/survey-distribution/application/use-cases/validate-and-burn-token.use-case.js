@@ -60,6 +60,7 @@ class ValidateAndBurnTokenUseCase {
                         surveyVersion,
                         anonymityLevel,
                         nodeId: vaultDoc.nodeId,
+                        matrixNodeIds: vaultDoc.matrixNodeIds || [],
                         employeeId: vaultDoc.employeeId,
                         expirationDate,
                     };

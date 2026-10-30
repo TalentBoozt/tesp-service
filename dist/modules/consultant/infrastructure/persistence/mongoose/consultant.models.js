@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.AiSignoffModel = exports.ExecutiveWorkshopModel = exports.IndustryBenchmarkModel = exports.ClientEngagementModel = void 0;
 const mongoose_1 = require("mongoose");
 const ClientEngagementSchema = new mongoose_1.Schema({
+    firmId: { type: String, required: false, index: true },
     projectId: { type: String, required: true, index: true },
     clientName: { type: String, required: true },
     clientCode: { type: String, required: true },
@@ -38,8 +39,10 @@ const ClientEngagementSchema = new mongoose_1.Schema({
         },
     },
 });
+ClientEngagementSchema.index({ firmId: 1, projectId: 1 });
 exports.ClientEngagementModel = (0, mongoose_1.model)('ClientEngagement', ClientEngagementSchema);
 const IndustryBenchmarkSchema = new mongoose_1.Schema({
+    firmId: { type: String, default: 'GLOBAL', index: true },
     metricKey: { type: String, required: true, index: true },
     metricName: { type: String, required: true },
     sector: { type: String, required: true, index: true },
@@ -59,9 +62,10 @@ const IndustryBenchmarkSchema = new mongoose_1.Schema({
         },
     },
 });
-IndustryBenchmarkSchema.index({ sector: 1, metricKey: 1 }, { unique: true });
+IndustryBenchmarkSchema.index({ firmId: 1, sector: 1, metricKey: 1 }, { unique: true });
 exports.IndustryBenchmarkModel = (0, mongoose_1.model)('IndustryBenchmark', IndustryBenchmarkSchema);
 const ExecutiveWorkshopSchema = new mongoose_1.Schema({
+    firmId: { type: String, required: false, index: true },
     projectId: { type: String, required: true, index: true },
     title: { type: String, required: true },
     clientName: { type: String, required: true },
@@ -89,8 +93,10 @@ const ExecutiveWorkshopSchema = new mongoose_1.Schema({
         },
     },
 });
+ExecutiveWorkshopSchema.index({ firmId: 1, projectId: 1 });
 exports.ExecutiveWorkshopModel = (0, mongoose_1.model)('ExecutiveWorkshop', ExecutiveWorkshopSchema);
 const AiSignoffSchema = new mongoose_1.Schema({
+    firmId: { type: String, required: false, index: true },
     projectId: { type: String, required: true, index: true },
     surveyTitle: { type: String, required: true },
     aiGeneratedInsight: { type: String, required: true },
@@ -118,5 +124,6 @@ const AiSignoffSchema = new mongoose_1.Schema({
         },
     },
 });
+AiSignoffSchema.index({ firmId: 1, projectId: 1 });
 exports.AiSignoffModel = (0, mongoose_1.model)('AiSignoff', AiSignoffSchema);
 //# sourceMappingURL=consultant.models.js.map

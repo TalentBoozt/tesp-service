@@ -20,7 +20,7 @@ class InviteUserUseCase {
     async execute(req) {
         const callerRole = (0, auth_middleware_1.normalizeUserRole)(req.inviterRole);
         // Only SUPER_ADMIN, CONSULTANT_DAASH, or PROJECT_ADMIN can invite
-        const allowedInviterRoles = [auth_middleware_1.UserRole.SUPER_ADMIN, auth_middleware_1.UserRole.CONSULTANT_DAASH, auth_middleware_1.UserRole.PROJECT_ADMIN];
+        const allowedInviterRoles = [auth_middleware_1.UserRole.SUPER_ADMIN, auth_middleware_1.UserRole.CONSULTANT_DAASH, auth_middleware_1.UserRole.CONSULTANT, auth_middleware_1.UserRole.PROJECT_ADMIN];
         if (!allowedInviterRoles.includes(callerRole)) {
             throw {
                 status: 403,
@@ -30,7 +30,7 @@ class InviteUserUseCase {
             };
         }
         const requestedRole = (0, auth_middleware_1.normalizeUserRole)(req.role);
-        const restrictedRoles = [auth_middleware_1.UserRole.SUPER_ADMIN, auth_middleware_1.UserRole.CONSULTANT_DAASH];
+        const restrictedRoles = [auth_middleware_1.UserRole.SUPER_ADMIN, auth_middleware_1.UserRole.CONSULTANT_DAASH, auth_middleware_1.UserRole.CONSULTANT];
         // Privilege Escalation Guard: Only SuperAdmin can invite SuperAdmin or Consultant
         if (callerRole !== auth_middleware_1.UserRole.SUPER_ADMIN && restrictedRoles.includes(requestedRole)) {
             throw {

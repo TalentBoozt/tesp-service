@@ -60,7 +60,7 @@ const NotificationSchema = new mongoose_1.Schema({
     },
     category: {
         type: String,
-        enum: ['CAMPAIGN', 'AI_ANOMALY', 'REPORT', 'HRIS', 'COMPLIANCE'],
+        enum: ['CAMPAIGN', 'AI_ANOMALY', 'REPORT', 'HRIS', 'COMPLIANCE', 'ORGANIZATION'],
         required: true,
         index: true,
     },

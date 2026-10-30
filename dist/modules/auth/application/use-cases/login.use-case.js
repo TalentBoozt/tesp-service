@@ -1,11 +1,16 @@
 "use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.LoginUseCase = void 0;
+const mongoose_1 = __importDefault(require("mongoose"));
 const mongo_user_repository_1 = require("../../infrastructure/persistence/mongo-user.repository");
 const bcrypt_hasher_service_1 = require("../../infrastructure/services/bcrypt-hasher.service");
 const identifier_resolver_service_1 = require("../../infrastructure/services/identifier-resolver.service");
 const auth_middleware_1 = require("../../../../shared/presentation/middleware/auth.middleware");
 const audit_logger_1 = require("../../../../shared/infrastructure/audit/audit-logger");
+const consulting_firm_schema_1 = require("../../../consultant/infrastructure/persistence/mongoose/consulting-firm.schema");
 class LoginUseCase {
     userRepository;
     hasher;
@@ -111,7 +116,28 @@ class LoginUseCase {
         if (request.projectId && user.isAuthorizedForProject(request.projectId)) {
             activeProjectId = request.projectId;
         }
-        // Mint production signed JWT containing mustChangePassword
+        // Resolve dynamic consulting firm context if user has an associated firm
+        let firmName = undefined;
+        if (user.firmId) {
+            if (mongoose_1.default.connection?.readyState === 1) {
+                try {
+                    const firmDoc = await consulting_firm_schema_1.ConsultingFirmModel.findOne({ firmId: user.firmId }).lean();
+                    if (firmDoc && firmDoc.name) {
+                        firmName = firmDoc.name;
+                    }
+                    else {
+                        firmName = 'Advisory Partner';
+                    }
+                }
+                catch {
+                    firmName = 'Advisory Partner';
+                }
+            }
+            else {
+                firmName = 'Advisory Partner';
+            }
+        }
+        // Mint production signed JWT containing mustChangePassword and dynamic firm context
         const token = (0, auth_middleware_1.generateToken)({
             userId: user.userId,
             role: user.role,
@@ -120,6 +146,8 @@ class LoginUseCase {
             email: user.email,
             employeeId: user.employeeId,
             authorizedProjectIds: user.authorizedProjectIds,
+            firmId: user.firmId,
+            firmName,
         });
         await audit_logger_1.AuditLogger.log({
             projectId: activeProjectId,
@@ -129,6 +157,7 @@ class LoginUseCase {
             resource: 'AUTH:LOGIN',
             details: {
                 mustChangePassword: user.mustChangePassword,
+                firmId: user.firmId,
             },
         });
         return {
@@ -143,6 +172,7 @@ class LoginUseCase {
                 projectId: activeProjectId,
                 authorizedProjectIds: user.authorizedProjectIds,
                 firmId: user.firmId,
+                firmName,
                 mustChangePassword: user.mustChangePassword,
                 employeeId: user.employeeId,
                 phoneNumber: user.phoneNumber,

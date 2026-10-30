@@ -10,6 +10,7 @@ const TokenVaultSchema = new mongoose_1.Schema({
     channel: { type: String, index: true },
     employeeId: { type: String, index: true },
     nodeId: { type: String },
+    matrixNodeIds: [{ type: String }],
     isBurned: { type: Boolean, default: false, index: true },
     burnedAt: { type: Date },
     expiresAt: { type: Date },

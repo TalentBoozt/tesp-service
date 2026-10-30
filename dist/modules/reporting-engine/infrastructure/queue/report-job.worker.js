@@ -12,6 +12,7 @@ const csv_report_generator_1 = require("../generators/csv-report.generator");
 const pdf_report_generator_1 = require("../generators/pdf-report.generator");
 const excel_report_generator_1 = require("../generators/excel-report.generator");
 const ppt_report_generator_1 = require("../generators/ppt-report.generator");
+const prompt_report_generator_1 = require("../generators/prompt-report.generator");
 const report_generated_event_1 = require("../../domain/events/report-generated.event");
 const fs_1 = __importDefault(require("fs"));
 class ReportJobWorker {
@@ -25,6 +26,7 @@ class ReportJobWorker {
     pdfGenerator;
     excelGenerator;
     pptGenerator;
+    promptGenerator;
     constructor(queue, reportJobRepo, eventBus = event_bus_1.DomainEventBus.getInstance(), storageService = storage_service_1.StorageService.getInstance()) {
         this.queue = queue;
         this.reportJobRepo = reportJobRepo;
@@ -34,6 +36,7 @@ class ReportJobWorker {
         this.pdfGenerator = new pdf_report_generator_1.PdfReportGenerator();
         this.excelGenerator = new excel_report_generator_1.ExcelReportGenerator();
         this.pptGenerator = new ppt_report_generator_1.PptReportGenerator();
+        this.promptGenerator = new prompt_report_generator_1.PromptReportGenerator();
     }
     static getInstance(reportJobRepo, eventBus, queue, storageService) {
         if (!ReportJobWorker.instance) {
@@ -93,7 +96,67 @@ class ReportJobWorker {
             let fileBuffer;
             let ext;
             let contentType;
-            if (format === 'EXCEL') {
+            if (format === 'PROMPT' ||
+                reportType === 'AGENTIC_PROMPT_PACK' ||
+                reportType?.includes('PROMPT') ||
+                reportType?.includes('AGENTIC')) {
+                ext = 'md';
+                contentType = 'text/markdown; charset=utf-8';
+                const res = await this.promptGenerator.generatePrompt({
+                    reportId: jobId,
+                    projectId,
+                    campaignId,
+                    title,
+                    scopeType,
+                    scopeFilter,
+                    requestedBy,
+                    branding: jobPayload.branding,
+                    benchmark: jobPayload.benchmark,
+                    bypassPrivacy: jobPayload.bypassPrivacy,
+                    includeAiSentimentSummary: jobPayload.includeAiSentimentSummary ?? true,
+                    includeBenchmarkComparison: jobPayload.includeBenchmarkComparison ?? true,
+                });
+                if (res?.promptContent) {
+                    fileBuffer = Buffer.from(res.promptContent, 'utf-8');
+                }
+                else if (res?.filePath) {
+                    fileBuffer = await fs_1.default.promises.readFile(res.filePath);
+                }
+                else {
+                    throw new Error('Export generation failed: Empty file output produced by generator');
+                }
+                if (!fileBuffer || fileBuffer.length === 0) {
+                    throw new Error('Export generation failed: Empty file output produced by generator');
+                }
+            }
+            else if (format === 'POWERPOINT' ||
+                reportType === 'BOARDROOM_DECK_POWERPOINT' ||
+                reportType?.includes('POWERPOINT') ||
+                reportType?.includes('PPT')) {
+                ext = 'pptx';
+                contentType = 'application/vnd.openxmlformats-officedocument.presentationml.presentation';
+                const res = await this.pptGenerator.generatePpt({
+                    reportId: jobId,
+                    projectId,
+                    campaignId,
+                    title,
+                    scopeType,
+                    scopeFilter,
+                    requestedBy,
+                    branding: jobPayload.branding,
+                    benchmark: jobPayload.benchmark,
+                    bypassPrivacy: jobPayload.bypassPrivacy,
+                });
+                if (!res?.filePath) {
+                    throw new Error('Export generation failed: Empty file output produced by generator');
+                }
+                fileBuffer = await fs_1.default.promises.readFile(res.filePath);
+                if (!fileBuffer || fileBuffer.length === 0) {
+                    throw new Error('Export generation failed: Empty file output produced by generator');
+                }
+            }
+            else if (format === 'EXCEL' ||
+                reportType === 'AGGREGATED_SCORES_XLSX') {
                 ext = 'xlsx';
                 contentType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
                 const res = await this.excelGenerator.generateExcel({
@@ -118,30 +181,10 @@ class ReportJobWorker {
                     throw new Error('Export generation failed: Empty file output produced by generator');
                 }
             }
-            else if (format === 'POWERPOINT') {
-                ext = 'pptx';
-                contentType = 'application/vnd.openxmlformats-officedocument.presentationml.presentation';
-                const res = await this.pptGenerator.generatePpt({
-                    reportId: jobId,
-                    projectId,
-                    campaignId,
-                    title,
-                    scopeType,
-                    scopeFilter,
-                    requestedBy,
-                    bypassPrivacy: jobPayload.bypassPrivacy,
-                });
-                if (!res?.filePath) {
-                    throw new Error('Export generation failed: Empty file output produced by generator');
-                }
-                fileBuffer = await fs_1.default.promises.readFile(res.filePath);
-                if (!fileBuffer || fileBuffer.length === 0) {
-                    throw new Error('Export generation failed: Empty file output produced by generator');
-                }
-            }
             else if (format === 'PDF' ||
                 reportType === 'EXEC_SUMMARY_PDF' ||
-                reportType === 'DEPT_BREAKDOWN_PDF') {
+                reportType === 'DEPT_BREAKDOWN_PDF' ||
+                reportType?.includes('PDF')) {
                 ext = 'pdf';
                 contentType = 'application/pdf';
                 const res = await this.pdfGenerator.generatePdf({

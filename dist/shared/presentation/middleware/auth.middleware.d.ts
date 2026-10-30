@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 export declare enum UserRole {
     SUPER_ADMIN = "SUPER_ADMIN",
     PROJECT_ADMIN = "PROJECT_ADMIN",
+    CONSULTANT = "CONSULTANT",
     CONSULTANT_DAASH = "CONSULTANT_DAASH",
     ORG_ADMIN = "ORG_ADMIN",
     HR_MANAGER = "HR_MANAGER",
@@ -19,6 +20,8 @@ export interface AuthenticatedUser {
     email?: string;
     employeeId?: string;
     authorizedProjectIds?: string[];
+    firmId?: string;
+    firmName?: string;
 }
 declare global {
     namespace Express {

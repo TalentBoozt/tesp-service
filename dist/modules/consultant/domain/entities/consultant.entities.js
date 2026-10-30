@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.AiSignoffEntity = exports.ExecutiveWorkshopEntity = exports.IndustryBenchmarkEntity = exports.ClientEngagementEntity = void 0;
 class ClientEngagementEntity {
     id;
+    firmId;
     projectId;
     clientName;
     clientCode;
@@ -19,6 +20,7 @@ class ClientEngagementEntity {
     updatedAt;
     constructor(props) {
         this.id = props.id;
+        this.firmId = props.firmId;
         this.projectId = props.projectId;
         this.clientName = props.clientName;
         this.clientCode = props.clientCode;
@@ -37,6 +39,7 @@ class ClientEngagementEntity {
     toJSON() {
         return {
             id: this.id,
+            firmId: this.firmId,
             projectId: this.projectId,
             clientName: this.clientName,
             clientCode: this.clientCode,
@@ -57,6 +60,7 @@ class ClientEngagementEntity {
 exports.ClientEngagementEntity = ClientEngagementEntity;
 class IndustryBenchmarkEntity {
     id;
+    firmId;
     metricKey;
     metricName;
     sector;
@@ -69,6 +73,7 @@ class IndustryBenchmarkEntity {
     updatedAt;
     constructor(props) {
         this.id = props.id;
+        this.firmId = props.firmId || 'GLOBAL';
         this.metricKey = props.metricKey;
         this.metricName = props.metricName;
         this.sector = props.sector;
@@ -87,6 +92,7 @@ class IndustryBenchmarkEntity {
     toJSON() {
         return {
             id: this.id,
+            firmId: this.firmId,
             metricKey: this.metricKey,
             metricName: this.metricName,
             sector: this.sector,
@@ -103,6 +109,7 @@ class IndustryBenchmarkEntity {
 exports.IndustryBenchmarkEntity = IndustryBenchmarkEntity;
 class ExecutiveWorkshopEntity {
     id;
+    firmId;
     projectId;
     title;
     clientName;
@@ -116,6 +123,7 @@ class ExecutiveWorkshopEntity {
     updatedAt;
     constructor(props) {
         this.id = props.id;
+        this.firmId = props.firmId;
         this.projectId = props.projectId;
         this.title = props.title;
         this.clientName = props.clientName;
@@ -131,6 +139,7 @@ class ExecutiveWorkshopEntity {
     toJSON() {
         return {
             id: this.id,
+            firmId: this.firmId,
             projectId: this.projectId,
             title: this.title,
             clientName: this.clientName,
@@ -148,6 +157,7 @@ class ExecutiveWorkshopEntity {
 exports.ExecutiveWorkshopEntity = ExecutiveWorkshopEntity;
 class AiSignoffEntity {
     id;
+    firmId;
     projectId;
     surveyTitle;
     aiGeneratedInsight;
@@ -161,6 +171,7 @@ class AiSignoffEntity {
     updatedAt;
     constructor(props) {
         this.id = props.id;
+        this.firmId = props.firmId;
         this.projectId = props.projectId;
         this.surveyTitle = props.surveyTitle;
         this.aiGeneratedInsight = props.aiGeneratedInsight;
@@ -183,6 +194,7 @@ class AiSignoffEntity {
     toJSON() {
         return {
             id: this.id,
+            firmId: this.firmId,
             projectId: this.projectId,
             surveyTitle: this.surveyTitle,
             aiGeneratedInsight: this.aiGeneratedInsight,

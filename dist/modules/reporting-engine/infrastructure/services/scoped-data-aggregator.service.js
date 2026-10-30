@@ -65,8 +65,12 @@ class ScopedDataAggregatorService {
                 }
                 query.$or = [
                     { nodeId: { $in: targetNodeIds } },
+                    { matrixNodeIds: { $in: targetNodeIds } },
+                    { 'demographicSnapshot.matrixNodeIds': { $in: targetNodeIds } },
+                    { 'demographicSnapshot.secondaryNodeIds': { $in: targetNodeIds } },
                     { 'demographicSnapshot.nodeId': { $in: targetNodeIds } },
                     { 'demographicSnapshot.department': scopeFilter.nodeName || scopeFilter.nodeId },
+                    { 'demographicSnapshot.Department': scopeFilter.nodeName || scopeFilter.nodeId },
                 ];
             }
             else if (scopeType === 'DEMOGRAPHIC_SEGMENT' && scopeFilter?.demographicKey) {
@@ -183,10 +187,11 @@ class ScopedDataAggregatorService {
                 suppressionNotice: notice,
             };
         }
-        // Helper: Determine if answer represents a rating or scale question
+        // Helper: Determine if answer represents a rating or scale question (excludes demographic choices)
         const isRating = (a) => typeof a?.numericValue === 'number' &&
             (!a.questionType ||
-                ['LIKERT', 'NUMERIC', 'RATING', 'SCALE', 'SCORE', 'STAR_RATING'].includes(String(a.questionType).toUpperCase()));
+                ['LIKERT', 'NUMERIC', 'RATING', 'SCALE', 'SCORE', 'STAR_RATING'].includes(String(a.questionType).toUpperCase())) &&
+            !(a.questionId && a.questionId.toUpperCase().includes('DEM'));
         // 2. Compute authentic eNPS
         let promoters = 0;
         let passives = 0;
@@ -194,7 +199,9 @@ class ScopedDataAggregatorService {
         let totalNps = 0;
         for (const r of responses) {
             for (const a of r.answers || []) {
-                if (a.questionType === 'NPS' && typeof a.numericValue === 'number') {
+                const qType = String(a.questionType || '').toUpperCase();
+                const qId = String(a.questionId || '').toUpperCase();
+                if ((qType === 'NPS' || qId.includes('NPS')) && typeof a.numericValue === 'number') {
                     totalNps++;
                     if (a.numericValue >= 9)
                         promoters++;
@@ -205,21 +212,21 @@ class ScopedDataAggregatorService {
                 }
             }
         }
-        // Fallback: If no explicit NPS questions were included in survey, compute proxy eNPS from Engagement (Q-ENG) or rating items
+        // Fallback: If no explicit NPS questions were included in survey, compute proxy eNPS from Engagement (Q-ENG) items
         if (totalNps === 0) {
             for (const r of responses) {
                 for (const a of r.answers || []) {
-                    if (isRating(a)) {
-                        const isEng = (a.questionId && a.questionId.toUpperCase().includes('ENG')) || true;
-                        if (isEng) {
-                            totalNps++;
-                            if (a.numericValue >= 5)
-                                promoters++;
-                            else if (a.numericValue >= 4)
-                                passives++;
-                            else
-                                detractors++;
-                        }
+                    const qId = String(a.questionId || '').toUpperCase();
+                    const grp = String(a.groupId || a.category || '').toUpperCase();
+                    const isEng = qId.includes('ENG') || grp.includes('ENG') || grp.includes('LOYAL') || grp.includes('RECOMMEND');
+                    if (isEng && isRating(a)) {
+                        totalNps++;
+                        if (a.numericValue >= 5)
+                            promoters++;
+                        else if (a.numericValue >= 4)
+                            passives++;
+                        else
+                            detractors++;
                     }
                 }
             }
@@ -283,12 +290,12 @@ class ScopedDataAggregatorService {
                             driverName = 'Wellbeing & Balance';
                         else if (p.includes('ENG'))
                             driverName = 'Employee Engagement';
-                        else if (p.includes('DEM') || p.includes('ENV'))
+                        else if (p.includes('ENV'))
                             driverName = 'Workplace Environment';
                         else
                             driverName = 'General Drivers';
                     }
-                    if (!driverName)
+                    if (!driverName || driverName === 'Workplace Environment')
                         driverName = 'General Drivers';
                     totalRatingScore += a.numericValue;
                     totalRatingCount++;
@@ -313,14 +320,41 @@ class ScopedDataAggregatorService {
                 variance: Math.round((score - benchmark) * 10) / 10,
             });
         }
-        // 5. Authentic Department Breakdown
+        // 5. Authentic Department Breakdown (includes primary node, secondary matrix nodes, and demographic department)
         const deptMap = new Map();
         for (const r of responses) {
-            const rawDept = r.demographicSnapshot?.department || r.nodeId || 'General';
-            const friendlyDept = nodeNameMap.get(rawDept) || rawDept;
-            if (!deptMap.has(friendlyDept))
-                deptMap.set(friendlyDept, []);
-            deptMap.get(friendlyDept).push(r);
+            const depts = new Set();
+            // Primary node
+            if (r.nodeId) {
+                const name = nodeNameMap.get(r.nodeId) || r.nodeId;
+                depts.add(name);
+            }
+            // Secondary Matrix Nodes
+            const matrixNodes = [
+                ...(Array.isArray(r.matrixNodeIds) ? r.matrixNodeIds : []),
+                ...(Array.isArray(r.demographicSnapshot?.matrixNodeIds) ? r.demographicSnapshot.matrixNodeIds : []),
+                ...(Array.isArray(r.demographicSnapshot?.secondaryNodeIds) ? r.demographicSnapshot.secondaryNodeIds : []),
+            ];
+            for (const m of matrixNodes) {
+                if (m) {
+                    const name = nodeNameMap.get(m) || m;
+                    depts.add(name);
+                }
+            }
+            // Demographic department text
+            const snap = r.demographicSnapshot || {};
+            const deptVal = snap.Department || snap.department || snap.Dept || snap.dept;
+            if (typeof deptVal === 'string' && deptVal.trim().length > 0 && isNaN(Number(deptVal))) {
+                depts.add(deptVal.trim());
+            }
+            if (depts.size === 0) {
+                depts.add('General');
+            }
+            for (const d of depts) {
+                if (!deptMap.has(d))
+                    deptMap.set(d, []);
+                deptMap.get(d).push(r);
+            }
         }
         const departmentBreakdown = [];
         for (const [department, deptResponses] of deptMap.entries()) {
@@ -333,11 +367,12 @@ class ScopedDataAggregatorService {
             let deptTotalNps = 0;
             for (const dr of deptResponses) {
                 for (const a of dr.answers || []) {
+                    const qId = String(a.questionId || '').toUpperCase();
                     if (isRating(a)) {
                         deptRatingScore += a.numericValue;
                         deptRatingCount++;
                     }
-                    else if (a.questionType === 'NPS' && typeof a.numericValue === 'number') {
+                    else if ((a.questionType === 'NPS' || qId.includes('NPS')) && typeof a.numericValue === 'number') {
                         deptTotalNps++;
                         if (a.numericValue >= 9)
                             deptPromoters++;
@@ -350,7 +385,10 @@ class ScopedDataAggregatorService {
             if (deptTotalNps === 0 && deptRatingCount > 0) {
                 for (const dr of deptResponses) {
                     for (const a of dr.answers || []) {
-                        if (isRating(a)) {
+                        const qId = String(a.questionId || '').toUpperCase();
+                        const grp = String(a.groupId || a.category || '').toUpperCase();
+                        const isEng = qId.includes('ENG') || grp.includes('ENG');
+                        if (isEng && isRating(a)) {
                             deptTotalNps++;
                             if (a.numericValue >= 5)
                                 deptPromoters++;
@@ -376,9 +414,9 @@ class ScopedDataAggregatorService {
         for (const r of responses) {
             if (r.demographicSnapshot) {
                 for (const [k, v] of Object.entries(r.demographicSnapshot)) {
-                    if (['nodeid', 'matrixteamid', 'department', 'team'].includes(k.toLowerCase()))
+                    if (['nodeid', 'matrixteamid', 'department', 'team', 'matrixnodeids', 'secondarynodeids'].includes(k.toLowerCase()))
                         continue;
-                    if (typeof v === 'string') {
+                    if (typeof v === 'string' && v.trim().length > 0) {
                         if (!demoMap.has(k))
                             demoMap.set(k, new Map());
                         const segMap = demoMap.get(k);

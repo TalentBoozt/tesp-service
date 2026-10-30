@@ -5,6 +5,7 @@ const get_employee_survey_history_use_case_1 = require("../../application/use-ca
 const manage_hris_config_use_case_1 = require("../../application/use-cases/manage-hris-config.use-case");
 const employee_dto_1 = require("../dto/employee.dto");
 const error_middleware_1 = require("../../../../shared/presentation/middleware/error.middleware");
+const auth_middleware_1 = require("../../../../shared/presentation/middleware/auth.middleware");
 const tenant_context_1 = require("../../../../shared/presentation/utils/tenant-context");
 class EmployeeController {
     createEmployeeUseCase;
@@ -159,10 +160,16 @@ class EmployeeController {
         try {
             const { employeeId } = req.params;
             const projectId = (0, tenant_context_1.resolveTenantProjectId)(req);
+            let targetEmpId = employeeId;
+            if (targetEmpId === 'me' ||
+                req.user?.role === auth_middleware_1.UserRole.SURVEY_RESPONDENT ||
+                req.user?.role === 'EMPLOYEE') {
+                targetEmpId = req.user?.employeeId || req.user?.userId || targetEmpId;
+            }
             if (!this.getEmployeeSurveyHistoryUseCase) {
                 this.getEmployeeSurveyHistoryUseCase = new get_employee_survey_history_use_case_1.GetEmployeeSurveyHistoryUseCase();
             }
-            const history = await this.getEmployeeSurveyHistoryUseCase.execute(projectId, employeeId);
+            const history = await this.getEmployeeSurveyHistoryUseCase.execute(projectId, targetEmpId);
             res.status(200).json(history);
         }
         catch (err) {

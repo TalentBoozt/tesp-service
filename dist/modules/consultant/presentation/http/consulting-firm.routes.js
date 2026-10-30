@@ -122,7 +122,7 @@ function createConsultingFirmRouter(firmRepo = new mongo_consulting_firm_reposit
         }
     });
     // 4. Consultant & Super Admin: Get portfolio of assigned client projects
-    router.get('/consultant/portfolio', (0, auth_middleware_1.authorize)([auth_middleware_1.UserRole.SUPER_ADMIN, auth_middleware_1.UserRole.CONSULTANT_DAASH, auth_middleware_1.UserRole.PROJECT_ADMIN]), async (req, res) => {
+    router.get('/consultant/portfolio', (0, auth_middleware_1.authorize)([auth_middleware_1.UserRole.SUPER_ADMIN, auth_middleware_1.UserRole.CONSULTANT, auth_middleware_1.UserRole.CONSULTANT_DAASH, auth_middleware_1.UserRole.PROJECT_ADMIN]), async (req, res) => {
         try {
             const userRole = (0, auth_middleware_1.normalizeUserRole)(req.user.role);
             // If SUPER_ADMIN, return all consulting firms and projects
@@ -142,16 +142,15 @@ function createConsultingFirmRouter(firmRepo = new mongo_consulting_firm_reposit
                     })),
                 });
             }
-            // For CONSULTANT_DAASH, locate their firm
-            let firm = await firmRepo.findByConsultantUserId(req.user.userId);
-            // Fallback: Check firm FIRM-DAASH-01 if direct link isn't established yet
-            if (!firm && userRole === auth_middleware_1.UserRole.CONSULTANT_DAASH) {
-                firm = await firmRepo.findByFirmId('FIRM-DAASH-01');
+            // For CONSULTANT or CONSULTANT_DAASH, locate their firm
+            let firm = req.user?.firmId ? await firmRepo.findByFirmId(req.user.firmId) : null;
+            if (!firm && req.user?.userId) {
+                firm = await firmRepo.findByConsultantUserId(req.user.userId);
             }
             if (!firm) {
                 return res.status(200).json({
                     firmId: null,
-                    firmName: 'Unassigned Advisory Firm',
+                    firmName: 'Independent Advisory Consultant',
                     assignedProjectIds: req.user?.projectId ? [req.user.projectId] : [],
                 });
             }

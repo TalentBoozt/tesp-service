@@ -32,7 +32,7 @@ class NotificationEntity {
         if (!props.message || props.message.trim().length === 0) {
             throw new Error('Notification message cannot be empty.');
         }
-        const validCategories = ['CAMPAIGN', 'AI_ANOMALY', 'REPORT', 'HRIS', 'COMPLIANCE'];
+        const validCategories = ['CAMPAIGN', 'AI_ANOMALY', 'REPORT', 'HRIS', 'COMPLIANCE', 'ORGANIZATION'];
         if (!validCategories.includes(props.category)) {
             throw new Error(`Invalid notification category '${props.category}'. Supported: ${validCategories.join(', ')}`);
         }
@@ -100,6 +100,10 @@ class NotificationEntity {
         // If targeted to a specific role broadcast
         if (this.recipientRole) {
             if (role === auth_middleware_1.UserRole.SUPER_ADMIN)
+                return true;
+            const isTargetConsultant = this.recipientRole === auth_middleware_1.UserRole.CONSULTANT || this.recipientRole === auth_middleware_1.UserRole.CONSULTANT_DAASH;
+            const isUserConsultant = role === auth_middleware_1.UserRole.CONSULTANT || role === auth_middleware_1.UserRole.CONSULTANT_DAASH;
+            if (isTargetConsultant && isUserConsultant)
                 return true;
             return this.recipientRole === role;
         }

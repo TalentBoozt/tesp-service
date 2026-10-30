@@ -1,4 +1,37 @@
 "use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.RequestReportGenerationUseCase = void 0;
 const report_job_entity_1 = require("../../domain/entities/report-job.entity");
@@ -33,11 +66,13 @@ class RequestReportGenerationUseCase {
     async execute(dto, requestedBy) {
         const jobId = `JOB-${Math.floor(10000000 + Math.random() * 90000000)}`;
         const determinedReportType = dto.reportType ||
-            (dto.format === 'EXCEL'
-                ? 'RAW_RESPONSES_XLSX'
+            (dto.format === 'PROMPT'
+                ? 'AGENTIC_PROMPT_PACK'
                 : dto.format === 'POWERPOINT'
                     ? 'BOARDROOM_DECK_POWERPOINT'
-                    : 'EXEC_SUMMARY_PDF');
+                    : dto.format === 'EXCEL'
+                        ? 'RAW_RESPONSES_XLSX'
+                        : 'EXEC_SUMMARY_PDF');
         const job = new report_job_entity_1.ReportJobEntity({
             projectId: dto.projectId,
             campaignId: dto.campaignId,
@@ -55,10 +90,34 @@ class RequestReportGenerationUseCase {
                 const project = await this.projectRepo.findByProjectId(dto.projectId);
                 if (project) {
                     if (project.branding) {
+                        let consultantFirmName = project.consultantFirmName;
+                        if (!consultantFirmName && project.consultantFirmId) {
+                            try {
+                                const mongoose = await Promise.resolve().then(() => __importStar(require('mongoose')));
+                                if (mongoose.default?.connection?.readyState === 1) {
+                                    const { ConsultingFirmModel } = await Promise.resolve().then(() => __importStar(require('../../../consultant/infrastructure/persistence/mongoose/consulting-firm.schema')));
+                                    const firm = await ConsultingFirmModel.findOne({ firmId: project.consultantFirmId }).lean();
+                                    if (firm) {
+                                        consultantFirmName = firm.name;
+                                    }
+                                }
+                            }
+                            catch {
+                                // ignore
+                            }
+                        }
+                        if (!consultantFirmName && project.tenantName) {
+                            consultantFirmName = project.tenantName;
+                        }
+                        if (!consultantFirmName) {
+                            consultantFirmName = 'Talnova Strategic Human Capital Advisory';
+                        }
                         branding = {
                             primaryColor: project.branding.primaryColor,
+                            secondaryColor: project.branding.secondaryColor,
                             logoUrl: project.branding.logoUrl,
                             organizationName: project.branding.companyName || project.name,
+                            consultantFirmName,
                         };
                     }
                     if (project.benchmarkSettings) {

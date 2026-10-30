@@ -15,6 +15,7 @@ var UserRole;
 (function (UserRole) {
     UserRole["SUPER_ADMIN"] = "SUPER_ADMIN";
     UserRole["PROJECT_ADMIN"] = "PROJECT_ADMIN";
+    UserRole["CONSULTANT"] = "CONSULTANT";
     UserRole["CONSULTANT_DAASH"] = "CONSULTANT_DAASH";
     UserRole["ORG_ADMIN"] = "ORG_ADMIN";
     UserRole["HR_MANAGER"] = "HR_MANAGER";
@@ -31,6 +32,7 @@ exports.ROLE_ALIASES = {
     // Canonical roles map directly to themselves
     PROJECT_ADMIN: UserRole.PROJECT_ADMIN,
     SUPER_ADMIN: UserRole.SUPER_ADMIN,
+    CONSULTANT: UserRole.CONSULTANT,
     CONSULTANT_DAASH: UserRole.CONSULTANT_DAASH,
     ORG_ADMIN: UserRole.ORG_ADMIN,
     HR_MANAGER: UserRole.HR_MANAGER,
@@ -70,7 +72,7 @@ function authenticate(req, res, next) {
         };
         if (req.user.mustChangePassword) {
             const url = req.originalUrl || req.url || req.path || '';
-            const allowedPaths = ['/auth/change-password', '/auth/logout', '/auth/me'];
+            const allowedPaths = ['/auth/change-password', '/auth/logout', '/auth/me', '/campaigns/my-surveys', '/survey-history'];
             const isAllowed = allowedPaths.some((p) => url.includes(p));
             if (!isAllowed) {
                 res.status(403).json({
@@ -128,7 +130,10 @@ function authorize(allowedRoles) {
         }
         const effectiveRole = normalizeUserRole(req.user.role);
         const normalizedAllowed = allowedRoles.map((r) => normalizeUserRole(r));
-        if (!normalizedAllowed.includes(effectiveRole) && effectiveRole !== UserRole.SUPER_ADMIN) {
+        const isConsultantEffective = effectiveRole === UserRole.CONSULTANT || effectiveRole === UserRole.CONSULTANT_DAASH;
+        const allowsConsultant = normalizedAllowed.includes(UserRole.CONSULTANT) || normalizedAllowed.includes(UserRole.CONSULTANT_DAASH);
+        const isRoleAuthorized = normalizedAllowed.includes(effectiveRole) || (isConsultantEffective && allowsConsultant);
+        if (!isRoleAuthorized && effectiveRole !== UserRole.SUPER_ADMIN) {
             res.status(403).json({
                 type: 'https://tesp-api.talnova.io/errors/forbidden',
                 title: 'Forbidden',
@@ -140,7 +145,8 @@ function authorize(allowedRoles) {
         }
         // Tenant Scope Isolation Check (BR-CFG-003)
         const isProjectCreation = req.method === 'POST' && (req.path === '/projects' || req.originalUrl?.endsWith('/projects'));
-        if (!isProjectCreation || effectiveRole !== UserRole.CONSULTANT_DAASH) {
+        const isConsultantRole = effectiveRole === UserRole.CONSULTANT || effectiveRole === UserRole.CONSULTANT_DAASH;
+        if (!isProjectCreation || !isConsultantRole) {
             const headerProjectId = (req.headers['x-project-id'] || req.headers['x-tenant-id'] || '').trim() || undefined;
             const queryProjectId = typeof req.query?.projectId === 'string' ? req.query.projectId.trim() : undefined;
             const targetProjectId = req.params.projectId || req.body?.projectId || queryProjectId || headerProjectId;

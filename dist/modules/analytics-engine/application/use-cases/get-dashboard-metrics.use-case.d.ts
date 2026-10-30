@@ -46,4 +46,12 @@ export declare class GetDashboardMetricsUseCase {
     private privacyGuard;
     constructor(responseRepo: ISurveyResponseRepository, redisAnalyticsRepo?: RedisAnalyticsRepository | undefined, projectRepo?: IProjectRepository | undefined);
     execute(projectId: string, campaignId: string, nodeId?: string, demographicFilters?: Record<string, any>, bypassPrivacy?: boolean): Promise<DashboardMetricsResult>;
+    getDemographicOptions(projectId: string, campaignId?: string): Promise<{
+        departments: string[];
+        tenures: string[];
+        workArrangements: string[];
+        employmentTypes: string[];
+        jobTitles: string[];
+        customDimensions: Record<string, string[]>;
+    }>;
 }

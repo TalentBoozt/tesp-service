@@ -12,6 +12,7 @@ export interface MySurveyItem {
     surveyUrl: string;
     expirationDate: string;
     startDate?: string;
+    status?: 'ACTIVE' | 'COMPLETED';
 }
 export declare class GetMySurveysUseCase {
     private campaignRepo?;

@@ -13,9 +13,10 @@ exports.RequestReportGenerationDtoSchema = zod_1.z.object({
         'RAW_RESPONSES_XLSX',
         'AGGREGATED_SCORES_XLSX',
         'BOARDROOM_DECK_POWERPOINT',
+        'AGENTIC_PROMPT_PACK',
         'SCOPED_REPORT',
     ]).optional(),
-    format: zod_1.z.enum(['PDF', 'EXCEL', 'POWERPOINT', 'WEB']).optional(),
+    format: zod_1.z.enum(['PDF', 'EXCEL', 'POWERPOINT', 'PROMPT', 'WEB']).optional(),
     scopeType: zod_1.z.enum(['ORGANIZATION', 'DEPARTMENT', 'DEMOGRAPHIC_SEGMENT', 'BUSINESS_UNIT']).optional(),
     scopeFilter: zod_1.z.object({
         nodeId: zod_1.z.string().optional(),
