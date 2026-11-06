@@ -2,7 +2,10 @@ import mongoose, { Document } from 'mongoose';
 export interface AuditLogDocument extends Document {
     eventId: string;
     auditId?: string;
-    projectId: string;
+    module?: string;
+    projectId?: string;
+    firmId?: string;
+    organizationId?: string;
     actorId: string;
     actorRole: string;
     action: string;

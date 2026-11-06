@@ -1,4 +1,4 @@
-export type QuestionType = 'LIKERT' | 'NPS' | 'RATING' | 'SINGLE_CHOICE' | 'MULTI_CHOICE' | 'SHORT_TEXT' | 'LONG_TEXT' | 'SLIDER' | 'RANKING' | 'MATRIX';
+export type QuestionType = 'LIKERT' | 'NPS' | 'RATING' | 'SINGLE_CHOICE' | 'MULTI_CHOICE' | 'SHORT_TEXT' | 'LONG_TEXT' | 'SLIDER' | 'RANKING' | 'MATRIX' | 'NUMERIC' | 'DATE';
 export interface AnswerProps {
     questionId: string;
     questionType: QuestionType;

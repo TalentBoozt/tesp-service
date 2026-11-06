@@ -6,6 +6,9 @@ class CustomAttributeDefinition {
     displayName;
     dataType;
     allowedValues;
+    isRequired;
+    isSurveyFilterable;
+    description;
     constructor(props) {
         if (!props.key || !/^[a-zA-Z0-9_]+$/.test(props.key)) {
             throw new Error(`Invalid custom attribute key '${props.key}'. Key must contain alphanumeric characters and underscores only.`);
@@ -13,8 +16,8 @@ class CustomAttributeDefinition {
         if (!props.displayName || props.displayName.trim().length === 0) {
             throw new Error('Custom attribute displayName is required');
         }
-        if (!['STRING', 'NUMERIC', 'ENUM', 'DATE'].includes(props.dataType)) {
-            throw new Error(`Invalid dataType '${props.dataType}'. Must be one of STRING, NUMERIC, ENUM, DATE.`);
+        if (!['STRING', 'NUMERIC', 'ENUM', 'DATE', 'BOOLEAN'].includes(props.dataType)) {
+            throw new Error(`Invalid dataType '${props.dataType}'. Must be one of STRING, NUMERIC, ENUM, DATE, BOOLEAN.`);
         }
         if (props.dataType === 'ENUM' && (!props.allowedValues || props.allowedValues.length === 0)) {
             throw new Error(`Custom attribute of type ENUM must provide at least one allowed value.`);
@@ -23,6 +26,9 @@ class CustomAttributeDefinition {
         this.displayName = props.displayName.trim();
         this.dataType = props.dataType;
         this.allowedValues = props.allowedValues;
+        this.isRequired = props.isRequired ?? false;
+        this.isSurveyFilterable = props.isSurveyFilterable ?? true;
+        this.description = props.description;
     }
     toJSON() {
         return {
@@ -30,6 +36,9 @@ class CustomAttributeDefinition {
             displayName: this.displayName,
             dataType: this.dataType,
             ...(this.allowedValues ? { allowedValues: this.allowedValues } : {}),
+            isRequired: this.isRequired,
+            isSurveyFilterable: this.isSurveyFilterable,
+            ...(this.description ? { description: this.description } : {}),
         };
     }
 }

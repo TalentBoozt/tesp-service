@@ -21,8 +21,11 @@ export interface IProjectDocument extends Document {
     customAttributeDefinitions: Array<{
         key: string;
         displayName: string;
-        dataType: 'STRING' | 'NUMERIC' | 'ENUM' | 'DATE';
+        dataType: 'STRING' | 'NUMERIC' | 'ENUM' | 'DATE' | 'BOOLEAN';
         allowedValues?: string[];
+        isRequired?: boolean;
+        isSurveyFilterable?: boolean;
+        description?: string;
     }>;
     aiConfig?: {
         provider: 'OPENAI' | 'GEMINI' | 'ANTHROPIC' | 'LOCAL_VLLM' | 'MOCK';

@@ -21,28 +21,43 @@ export declare const BrandingSchema: z.ZodObject<{
 export declare const CustomAttributeSchema: z.ZodEffects<z.ZodObject<{
     key: z.ZodString;
     displayName: z.ZodString;
-    dataType: z.ZodEnum<["STRING", "NUMERIC", "ENUM", "DATE"]>;
+    dataType: z.ZodEnum<["STRING", "NUMERIC", "ENUM", "DATE", "BOOLEAN"]>;
     allowedValues: z.ZodOptional<z.ZodArray<z.ZodString, "many">>;
+    isRequired: z.ZodOptional<z.ZodBoolean>;
+    isSurveyFilterable: z.ZodOptional<z.ZodBoolean>;
+    description: z.ZodOptional<z.ZodString>;
 }, "strip", z.ZodTypeAny, {
     key: string;
     displayName: string;
-    dataType: "STRING" | "NUMERIC" | "ENUM" | "DATE";
+    dataType: "STRING" | "NUMERIC" | "ENUM" | "DATE" | "BOOLEAN";
     allowedValues?: string[] | undefined;
+    description?: string | undefined;
+    isRequired?: boolean | undefined;
+    isSurveyFilterable?: boolean | undefined;
 }, {
     key: string;
     displayName: string;
-    dataType: "STRING" | "NUMERIC" | "ENUM" | "DATE";
+    dataType: "STRING" | "NUMERIC" | "ENUM" | "DATE" | "BOOLEAN";
     allowedValues?: string[] | undefined;
+    description?: string | undefined;
+    isRequired?: boolean | undefined;
+    isSurveyFilterable?: boolean | undefined;
 }>, {
     key: string;
     displayName: string;
-    dataType: "STRING" | "NUMERIC" | "ENUM" | "DATE";
+    dataType: "STRING" | "NUMERIC" | "ENUM" | "DATE" | "BOOLEAN";
     allowedValues?: string[] | undefined;
+    description?: string | undefined;
+    isRequired?: boolean | undefined;
+    isSurveyFilterable?: boolean | undefined;
 }, {
     key: string;
     displayName: string;
-    dataType: "STRING" | "NUMERIC" | "ENUM" | "DATE";
+    dataType: "STRING" | "NUMERIC" | "ENUM" | "DATE" | "BOOLEAN";
     allowedValues?: string[] | undefined;
+    description?: string | undefined;
+    isRequired?: boolean | undefined;
+    isSurveyFilterable?: boolean | undefined;
 }>;
 export declare const CreateProjectSchema: z.ZodEffects<z.ZodObject<{
     projectId: z.ZodString;
@@ -90,28 +105,43 @@ export declare const CreateProjectSchema: z.ZodEffects<z.ZodObject<{
     customAttributeDefinitions: z.ZodOptional<z.ZodArray<z.ZodEffects<z.ZodObject<{
         key: z.ZodString;
         displayName: z.ZodString;
-        dataType: z.ZodEnum<["STRING", "NUMERIC", "ENUM", "DATE"]>;
+        dataType: z.ZodEnum<["STRING", "NUMERIC", "ENUM", "DATE", "BOOLEAN"]>;
         allowedValues: z.ZodOptional<z.ZodArray<z.ZodString, "many">>;
+        isRequired: z.ZodOptional<z.ZodBoolean>;
+        isSurveyFilterable: z.ZodOptional<z.ZodBoolean>;
+        description: z.ZodOptional<z.ZodString>;
     }, "strip", z.ZodTypeAny, {
         key: string;
         displayName: string;
-        dataType: "STRING" | "NUMERIC" | "ENUM" | "DATE";
+        dataType: "STRING" | "NUMERIC" | "ENUM" | "DATE" | "BOOLEAN";
         allowedValues?: string[] | undefined;
+        description?: string | undefined;
+        isRequired?: boolean | undefined;
+        isSurveyFilterable?: boolean | undefined;
     }, {
         key: string;
         displayName: string;
-        dataType: "STRING" | "NUMERIC" | "ENUM" | "DATE";
+        dataType: "STRING" | "NUMERIC" | "ENUM" | "DATE" | "BOOLEAN";
         allowedValues?: string[] | undefined;
+        description?: string | undefined;
+        isRequired?: boolean | undefined;
+        isSurveyFilterable?: boolean | undefined;
     }>, {
         key: string;
         displayName: string;
-        dataType: "STRING" | "NUMERIC" | "ENUM" | "DATE";
+        dataType: "STRING" | "NUMERIC" | "ENUM" | "DATE" | "BOOLEAN";
         allowedValues?: string[] | undefined;
+        description?: string | undefined;
+        isRequired?: boolean | undefined;
+        isSurveyFilterable?: boolean | undefined;
     }, {
         key: string;
         displayName: string;
-        dataType: "STRING" | "NUMERIC" | "ENUM" | "DATE";
+        dataType: "STRING" | "NUMERIC" | "ENUM" | "DATE" | "BOOLEAN";
         allowedValues?: string[] | undefined;
+        description?: string | undefined;
+        isRequired?: boolean | undefined;
+        isSurveyFilterable?: boolean | undefined;
     }>, "many">>;
 }, "strip", z.ZodTypeAny, {
     projectId: string;
@@ -135,8 +165,11 @@ export declare const CreateProjectSchema: z.ZodEffects<z.ZodObject<{
     customAttributeDefinitions?: {
         key: string;
         displayName: string;
-        dataType: "STRING" | "NUMERIC" | "ENUM" | "DATE";
+        dataType: "STRING" | "NUMERIC" | "ENUM" | "DATE" | "BOOLEAN";
         allowedValues?: string[] | undefined;
+        description?: string | undefined;
+        isRequired?: boolean | undefined;
+        isSurveyFilterable?: boolean | undefined;
     }[] | undefined;
     tenantId?: string | undefined;
     clientOrgName?: string | undefined;
@@ -162,8 +195,11 @@ export declare const CreateProjectSchema: z.ZodEffects<z.ZodObject<{
     customAttributeDefinitions?: {
         key: string;
         displayName: string;
-        dataType: "STRING" | "NUMERIC" | "ENUM" | "DATE";
+        dataType: "STRING" | "NUMERIC" | "ENUM" | "DATE" | "BOOLEAN";
         allowedValues?: string[] | undefined;
+        description?: string | undefined;
+        isRequired?: boolean | undefined;
+        isSurveyFilterable?: boolean | undefined;
     }[] | undefined;
     tenantId?: string | undefined;
     clientOrgName?: string | undefined;
@@ -189,8 +225,11 @@ export declare const CreateProjectSchema: z.ZodEffects<z.ZodObject<{
     customAttributeDefinitions?: {
         key: string;
         displayName: string;
-        dataType: "STRING" | "NUMERIC" | "ENUM" | "DATE";
+        dataType: "STRING" | "NUMERIC" | "ENUM" | "DATE" | "BOOLEAN";
         allowedValues?: string[] | undefined;
+        description?: string | undefined;
+        isRequired?: boolean | undefined;
+        isSurveyFilterable?: boolean | undefined;
     }[] | undefined;
     tenantId?: string | undefined;
     clientOrgName?: string | undefined;
@@ -216,8 +255,11 @@ export declare const CreateProjectSchema: z.ZodEffects<z.ZodObject<{
     customAttributeDefinitions?: {
         key: string;
         displayName: string;
-        dataType: "STRING" | "NUMERIC" | "ENUM" | "DATE";
+        dataType: "STRING" | "NUMERIC" | "ENUM" | "DATE" | "BOOLEAN";
         allowedValues?: string[] | undefined;
+        description?: string | undefined;
+        isRequired?: boolean | undefined;
+        isSurveyFilterable?: boolean | undefined;
     }[] | undefined;
     tenantId?: string | undefined;
     clientOrgName?: string | undefined;
@@ -248,28 +290,43 @@ export declare const UpdateProjectSchema: z.ZodEffects<z.ZodObject<{
     customAttributeDefinitions: z.ZodOptional<z.ZodArray<z.ZodEffects<z.ZodObject<{
         key: z.ZodString;
         displayName: z.ZodString;
-        dataType: z.ZodEnum<["STRING", "NUMERIC", "ENUM", "DATE"]>;
+        dataType: z.ZodEnum<["STRING", "NUMERIC", "ENUM", "DATE", "BOOLEAN"]>;
         allowedValues: z.ZodOptional<z.ZodArray<z.ZodString, "many">>;
+        isRequired: z.ZodOptional<z.ZodBoolean>;
+        isSurveyFilterable: z.ZodOptional<z.ZodBoolean>;
+        description: z.ZodOptional<z.ZodString>;
     }, "strip", z.ZodTypeAny, {
         key: string;
         displayName: string;
-        dataType: "STRING" | "NUMERIC" | "ENUM" | "DATE";
+        dataType: "STRING" | "NUMERIC" | "ENUM" | "DATE" | "BOOLEAN";
         allowedValues?: string[] | undefined;
+        description?: string | undefined;
+        isRequired?: boolean | undefined;
+        isSurveyFilterable?: boolean | undefined;
     }, {
         key: string;
         displayName: string;
-        dataType: "STRING" | "NUMERIC" | "ENUM" | "DATE";
+        dataType: "STRING" | "NUMERIC" | "ENUM" | "DATE" | "BOOLEAN";
         allowedValues?: string[] | undefined;
+        description?: string | undefined;
+        isRequired?: boolean | undefined;
+        isSurveyFilterable?: boolean | undefined;
     }>, {
         key: string;
         displayName: string;
-        dataType: "STRING" | "NUMERIC" | "ENUM" | "DATE";
+        dataType: "STRING" | "NUMERIC" | "ENUM" | "DATE" | "BOOLEAN";
         allowedValues?: string[] | undefined;
+        description?: string | undefined;
+        isRequired?: boolean | undefined;
+        isSurveyFilterable?: boolean | undefined;
     }, {
         key: string;
         displayName: string;
-        dataType: "STRING" | "NUMERIC" | "ENUM" | "DATE";
+        dataType: "STRING" | "NUMERIC" | "ENUM" | "DATE" | "BOOLEAN";
         allowedValues?: string[] | undefined;
+        description?: string | undefined;
+        isRequired?: boolean | undefined;
+        isSurveyFilterable?: boolean | undefined;
     }>, "many">>;
 }, "strip", z.ZodTypeAny, {
     name?: string | undefined;
@@ -285,8 +342,11 @@ export declare const UpdateProjectSchema: z.ZodEffects<z.ZodObject<{
     customAttributeDefinitions?: {
         key: string;
         displayName: string;
-        dataType: "STRING" | "NUMERIC" | "ENUM" | "DATE";
+        dataType: "STRING" | "NUMERIC" | "ENUM" | "DATE" | "BOOLEAN";
         allowedValues?: string[] | undefined;
+        description?: string | undefined;
+        isRequired?: boolean | undefined;
+        isSurveyFilterable?: boolean | undefined;
     }[] | undefined;
 }, {
     name?: string | undefined;
@@ -302,8 +362,11 @@ export declare const UpdateProjectSchema: z.ZodEffects<z.ZodObject<{
     customAttributeDefinitions?: {
         key: string;
         displayName: string;
-        dataType: "STRING" | "NUMERIC" | "ENUM" | "DATE";
+        dataType: "STRING" | "NUMERIC" | "ENUM" | "DATE" | "BOOLEAN";
         allowedValues?: string[] | undefined;
+        description?: string | undefined;
+        isRequired?: boolean | undefined;
+        isSurveyFilterable?: boolean | undefined;
     }[] | undefined;
 }>, {
     name?: string | undefined;
@@ -319,8 +382,11 @@ export declare const UpdateProjectSchema: z.ZodEffects<z.ZodObject<{
     customAttributeDefinitions?: {
         key: string;
         displayName: string;
-        dataType: "STRING" | "NUMERIC" | "ENUM" | "DATE";
+        dataType: "STRING" | "NUMERIC" | "ENUM" | "DATE" | "BOOLEAN";
         allowedValues?: string[] | undefined;
+        description?: string | undefined;
+        isRequired?: boolean | undefined;
+        isSurveyFilterable?: boolean | undefined;
     }[] | undefined;
 }, {
     name?: string | undefined;
@@ -336,8 +402,11 @@ export declare const UpdateProjectSchema: z.ZodEffects<z.ZodObject<{
     customAttributeDefinitions?: {
         key: string;
         displayName: string;
-        dataType: "STRING" | "NUMERIC" | "ENUM" | "DATE";
+        dataType: "STRING" | "NUMERIC" | "ENUM" | "DATE" | "BOOLEAN";
         allowedValues?: string[] | undefined;
+        description?: string | undefined;
+        isRequired?: boolean | undefined;
+        isSurveyFilterable?: boolean | undefined;
     }[] | undefined;
 }>;
 export declare const ToggleFeaturesSchema: z.ZodObject<{

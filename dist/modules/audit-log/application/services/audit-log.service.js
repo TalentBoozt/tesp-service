@@ -12,6 +12,7 @@ const audit_log_schema_1 = require("../../infrastructure/persistence/mongoose/au
 class AuditLogService {
     static instance;
     isSubscribed = false;
+    inMemoryModuleLogs = [];
     static getInstance() {
         if (!AuditLogService.instance) {
             AuditLogService.instance = new AuditLogService();
@@ -36,13 +37,20 @@ class AuditLogService {
     }
     async recordAuditLog(props) {
         try {
+            const entity = new audit_log_entity_1.AuditLogEntity(props);
+            this.inMemoryModuleLogs.unshift(entity.toJSON());
+            if (this.inMemoryModuleLogs.length > 500) {
+                this.inMemoryModuleLogs.length = 500;
+            }
             if (mongoose_1.default.connection?.readyState !== 1) {
                 return null;
             }
-            const entity = new audit_log_entity_1.AuditLogEntity(props);
             const doc = new audit_log_schema_1.AuditLogModel({
                 eventId: entity.eventId,
+                module: entity.module,
                 projectId: entity.projectId,
+                firmId: entity.firmId,
+                organizationId: entity.organizationId,
                 actorId: entity.actorId,
                 actorRole: entity.actorRole,
                 action: entity.action,
@@ -58,6 +66,11 @@ class AuditLogService {
             console.error('[AuditLogService] Error recording audit log:', err);
             return null;
         }
+    }
+    getInMemoryModuleLogs(moduleName) {
+        if (!moduleName)
+            return [...this.inMemoryModuleLogs];
+        return this.inMemoryModuleLogs.filter((l) => l.module === moduleName);
     }
     async handleDomainEvent(event) {
         const eventType = event.eventType;
@@ -166,8 +179,17 @@ class AuditLogService {
             };
         }
         const filter = {};
+        if (params.module && params.module !== 'ALL') {
+            filter.module = params.module;
+        }
         if (params.projectId && params.projectId !== 'ALL') {
             filter.projectId = params.projectId;
+        }
+        if (params.firmId && params.firmId !== 'ALL') {
+            filter.firmId = params.firmId;
+        }
+        if (params.organizationId && params.organizationId !== 'ALL') {
+            filter.organizationId = params.organizationId;
         }
         if (params.action && params.action !== 'ALL') {
             filter.action = params.action;
@@ -210,7 +232,10 @@ class AuditLogService {
         const data = docs.map((doc) => ({
             id: doc._id?.toString() || doc.eventId,
             eventId: doc.eventId,
-            projectId: doc.projectId,
+            module: doc.module || 'ENTERPRISE_SURVEY',
+            projectId: doc.projectId || '',
+            firmId: doc.firmId,
+            organizationId: doc.organizationId,
             actorId: doc.actorId,
             actorRole: doc.actorRole,
             action: doc.action,

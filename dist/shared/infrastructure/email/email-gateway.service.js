@@ -18,7 +18,25 @@ class EmailGatewayService {
     async dispatch(options) {
         let emailConfig;
         if (options.overrideConfig) {
-            emailConfig = new email_config_vo_1.EmailConfig(options.overrideConfig);
+            let project = null;
+            if (mongoose_1.default.connection?.readyState === 1) {
+                project = await project_schema_1.ProjectModel.findOne({ projectId: options.projectId, isDeleted: false }).lean().catch(() => null);
+            }
+            const saved = project?.emailConfig || {};
+            const merged = {
+                ...saved,
+                ...options.overrideConfig,
+            };
+            if (!merged.smtpPassword || merged.smtpPassword.includes('••••')) {
+                merged.smtpPassword = saved.smtpPassword || (merged.provider === 'ZOHO_SMTP' ? process.env.SMTP_PASS : undefined);
+            }
+            if (!merged.zeptoMailApiKey || merged.zeptoMailApiKey.includes('••••')) {
+                merged.zeptoMailApiKey = saved.zeptoMailApiKey;
+            }
+            if (!merged.smtpUser) {
+                merged.smtpUser = saved.smtpUser || (merged.provider === 'ZOHO_SMTP' ? process.env.SMTP_USER : undefined);
+            }
+            emailConfig = new email_config_vo_1.EmailConfig(merged);
         }
         else {
             let project = null;
@@ -110,14 +128,28 @@ class EmailGatewayService {
             message: `Resolved tenant email configuration for ${projectId}`,
         });
         let config;
+        let project = null;
+        if (mongoose_1.default.connection?.readyState === 1) {
+            project = await project_schema_1.ProjectModel.findOne({ projectId, isDeleted: false }).lean().catch(() => null);
+        }
         if (customConfig && customConfig.provider) {
-            config = new email_config_vo_1.EmailConfig(customConfig);
+            const saved = project?.emailConfig || {};
+            const resolvedProps = {
+                ...saved,
+                ...customConfig,
+            };
+            if (!resolvedProps.smtpPassword || resolvedProps.smtpPassword.includes('••••')) {
+                resolvedProps.smtpPassword = saved.smtpPassword || (resolvedProps.provider === 'ZOHO_SMTP' ? process.env.SMTP_PASS : undefined);
+            }
+            if (!resolvedProps.zeptoMailApiKey || resolvedProps.zeptoMailApiKey.includes('••••')) {
+                resolvedProps.zeptoMailApiKey = saved.zeptoMailApiKey;
+            }
+            if (!resolvedProps.smtpUser) {
+                resolvedProps.smtpUser = saved.smtpUser || (resolvedProps.provider === 'ZOHO_SMTP' ? process.env.SMTP_USER : undefined);
+            }
+            config = new email_config_vo_1.EmailConfig(resolvedProps);
         }
         else {
-            let project = null;
-            if (mongoose_1.default.connection?.readyState === 1) {
-                project = await project_schema_1.ProjectModel.findOne({ projectId, isDeleted: false }).lean().catch(() => null);
-            }
             config = new email_config_vo_1.EmailConfig(project?.emailConfig || {});
         }
         // Step 2: Protocol Handshake

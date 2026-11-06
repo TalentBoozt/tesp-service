@@ -12,8 +12,11 @@ exports.BrandingSchema = zod_1.z.object({
 exports.CustomAttributeSchema = zod_1.z.object({
     key: zod_1.z.string().regex(/^[a-zA-Z0-9_]+$/, 'Attribute key must contain alphanumeric characters and underscores only'),
     displayName: zod_1.z.string().min(1, 'Attribute displayName is required'),
-    dataType: zod_1.z.enum(['STRING', 'NUMERIC', 'ENUM', 'DATE']),
+    dataType: zod_1.z.enum(['STRING', 'NUMERIC', 'ENUM', 'DATE', 'BOOLEAN']),
     allowedValues: zod_1.z.array(zod_1.z.string()).optional(),
+    isRequired: zod_1.z.boolean().optional(),
+    isSurveyFilterable: zod_1.z.boolean().optional(),
+    description: zod_1.z.string().optional(),
 }).refine((data) => {
     if (data.dataType === 'ENUM') {
         return Array.isArray(data.allowedValues) && data.allowedValues.length > 0;

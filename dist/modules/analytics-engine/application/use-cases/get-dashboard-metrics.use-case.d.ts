@@ -53,5 +53,13 @@ export declare class GetDashboardMetricsUseCase {
         employmentTypes: string[];
         jobTitles: string[];
         customDimensions: Record<string, string[]>;
+        attributes: Array<{
+            key: string;
+            displayName: string;
+            dataType: string;
+            options: string[];
+            isFilterable: boolean;
+            source: 'METAMODEL' | 'ROSTER_DISCOVERED';
+        }>;
     }>;
 }

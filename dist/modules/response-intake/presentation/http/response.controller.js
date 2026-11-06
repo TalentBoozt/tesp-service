@@ -120,16 +120,35 @@ class ResponseController {
             }
             if (Array.isArray(body.answers)) {
                 body.answers = body.answers.map((a) => {
-                    if (a.questionType)
-                        return a;
-                    const isNum = typeof a.value === 'number';
-                    const isArr = Array.isArray(a.value);
+                    let qType = a.questionType;
+                    if (!qType) {
+                        const isNum = typeof a.value === 'number';
+                        const isArr = Array.isArray(a.value);
+                        qType = isNum ? 'RATING' : isArr ? 'MULTI_CHOICE' : 'LONG_TEXT';
+                    }
+                    // Normalize frontend variant types to intake schema standards
+                    if (qType === 'MULTIPLE_CHOICE')
+                        qType = 'MULTI_CHOICE';
+                    else if (qType === 'LIKERT_5' || qType === 'LIKERT_7')
+                        qType = 'LIKERT';
+                    else if (qType === 'NPS_11')
+                        qType = 'NPS';
+                    else if (qType === 'RATING_STAR')
+                        qType = 'RATING';
+                    else if (qType === 'TEXT' || qType === 'TEXT_SHORT')
+                        qType = 'SHORT_TEXT';
+                    else if (qType === 'TEXT_LONG')
+                        qType = 'LONG_TEXT';
+                    const isNum = typeof (a.numericValue ?? a.value) === 'number';
+                    const isArr = Array.isArray(a.selectedOptions ?? a.value);
                     return {
                         questionId: a.questionId,
-                        questionType: isNum ? 'RATING' : isArr ? 'MULTI_CHOICE' : 'LONG_TEXT',
-                        numericValue: isNum ? a.value : undefined,
-                        textValue: typeof a.value === 'string' ? a.value : (!isNum && !isArr && a.value != null ? String(a.value) : undefined),
-                        selectedOptions: isArr ? a.value : undefined,
+                        questionType: qType,
+                        numericValue: isNum ? (a.numericValue ?? a.value) : undefined,
+                        textValue: a.textValue !== undefined
+                            ? a.textValue
+                            : (typeof a.value === 'string' ? a.value : (!isNum && !isArr && a.value != null ? String(a.value) : undefined)),
+                        selectedOptions: isArr ? (a.selectedOptions ?? a.value) : (a.selectedOptions || undefined),
                     };
                 });
             }

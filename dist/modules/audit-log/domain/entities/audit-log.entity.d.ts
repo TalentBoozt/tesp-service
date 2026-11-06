@@ -1,7 +1,10 @@
 export interface AuditLogProps {
     id?: string;
     eventId?: string;
-    projectId: string;
+    module?: string;
+    projectId?: string;
+    firmId?: string;
+    organizationId?: string;
     actorId: string;
     actorRole: string;
     action: string;
@@ -14,7 +17,10 @@ export interface AuditLogProps {
 export declare class AuditLogEntity {
     readonly id?: string;
     readonly eventId: string;
-    readonly projectId: string;
+    readonly module: string;
+    readonly projectId?: string;
+    readonly firmId?: string;
+    readonly organizationId?: string;
     readonly actorId: string;
     readonly actorRole: string;
     readonly action: string;

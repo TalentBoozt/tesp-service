@@ -57,11 +57,11 @@ class EmailConfig {
         this.provider = provider;
         this.fromName = (props?.fromName || 'Talnova Survey Team').trim();
         this.fromEmail = fromEmail;
-        this.zeptoMailApiKey = props?.zeptoMailApiKey;
+        this.zeptoMailApiKey = props?.zeptoMailApiKey?.trim();
         this.zeptoMailRegion = props?.zeptoMailRegion || 'US';
-        this.smtpHost = props?.smtpHost || (provider === 'ZOHO_SMTP' ? 'smtp.zoho.com' : provider === 'GOOGLE_WORKSPACE_SMTP' ? 'smtp.gmail.com' : undefined);
-        this.smtpUser = props?.smtpUser;
-        this.smtpPassword = props?.smtpPassword;
+        this.smtpHost = props?.smtpHost?.trim() || (provider === 'ZOHO_SMTP' ? 'smtp.zoho.com' : provider === 'GOOGLE_WORKSPACE_SMTP' ? 'smtp.gmail.com' : undefined);
+        this.smtpUser = props?.smtpUser?.trim();
+        this.smtpPassword = props?.smtpPassword?.trim();
         this.useTls = props?.useTls ?? (provider === 'ZOHO_SMTP' || provider === 'GOOGLE_WORKSPACE_SMTP');
         this.dailySendLimit = props?.dailySendLimit ?? (provider === 'ZOHO_ZEPTOMAIL_CPAAS' ? 50000 : 1000);
         this.isDomainVerified = props?.isDomainVerified ?? false;

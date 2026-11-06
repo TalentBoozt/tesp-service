@@ -24,6 +24,7 @@ const consulting_firm_routes_1 = require("./modules/consultant/presentation/http
 const audit_log_routes_1 = require("./modules/audit-log/presentation/http/audit-log.routes");
 const auth_routes_1 = require("./modules/auth/presentation/http/auth.routes");
 const notification_routes_1 = require("./modules/notification/presentation/http/notification.routes");
+const social_styles_routes_1 = require("./modules/social-styles/presentation/http/social-styles.routes");
 const rate_limit_middleware_1 = require("./shared/presentation/middleware/rate-limit.middleware");
 const error_middleware_1 = require("./shared/presentation/middleware/error.middleware");
 function createApp() {
@@ -78,6 +79,7 @@ function createApp() {
     app.use('/api/v1', (0, campaign_routes_1.createCampaignRouter)());
     app.use('/api/v1/responses', rate_limit_middleware_1.intakeRateLimiter);
     app.use('/api/v1', (0, response_routes_1.createResponseIntakeRouter)());
+    app.use('/api/v1', (0, social_styles_routes_1.createSocialStylesRouter)());
     app.use('/api/v1', (0, analytics_routes_1.createAnalyticsEngineRouter)());
     app.use('/api/v1', (0, ai_analytics_routes_1.createAiAnalyticsRouter)());
     app.use('/api/v1', (0, report_routes_1.createReportingEngineRouter)());

@@ -628,25 +628,112 @@ class GetDashboardMetricsUseCase {
         const employmentTypes = new Set();
         const jobTitles = new Set();
         const customDimensionsMap = new Map();
+        const attributesMap = new Map();
+        // 1. Load Dynamic Demographic Attribute Metamodel from Tenant Settings (Project Config)
+        if (this.projectRepo) {
+            try {
+                const project = await this.projectRepo.findByProjectId(projectId);
+                if (project && Array.isArray(project.customAttributeDefinitions)) {
+                    for (const def of project.customAttributeDefinitions) {
+                        const rawKey = def.key;
+                        if (!rawKey)
+                            continue;
+                        const optionsSet = new Set();
+                        if (Array.isArray(def.allowedValues)) {
+                            def.allowedValues.forEach((val) => {
+                                if (val && typeof val === 'string' && val.trim().length > 0) {
+                                    optionsSet.add(val.trim());
+                                }
+                            });
+                        }
+                        if (def.dataType === 'BOOLEAN') {
+                            optionsSet.add('Yes');
+                            optionsSet.add('No');
+                        }
+                        attributesMap.set(rawKey, {
+                            key: rawKey,
+                            displayName: def.displayName || rawKey,
+                            dataType: def.dataType || 'STRING',
+                            options: optionsSet,
+                            isFilterable: def.isSurveyFilterable !== false,
+                            source: 'METAMODEL',
+                        });
+                    }
+                }
+            }
+            catch {
+                // Fallback gracefully if project repo query fails
+            }
+        }
         if (mongoose_1.default.connection.readyState === 1) {
             try {
+                // If attributesMap is still empty, load directly from ProjectModel schema
+                if (attributesMap.size === 0) {
+                    const { ProjectModel } = await Promise.resolve().then(() => __importStar(require('../../../project-config/infrastructure/persistence/mongoose/project.schema')));
+                    const projectDoc = await ProjectModel.findOne({ projectId, isDeleted: false }).lean();
+                    if (projectDoc && Array.isArray(projectDoc.customAttributeDefinitions)) {
+                        for (const def of projectDoc.customAttributeDefinitions) {
+                            const rawKey = def.key;
+                            if (!rawKey)
+                                continue;
+                            const optionsSet = new Set();
+                            if (Array.isArray(def.allowedValues)) {
+                                def.allowedValues.forEach((val) => {
+                                    if (val && typeof val === 'string' && val.trim().length > 0) {
+                                        optionsSet.add(val.trim());
+                                    }
+                                });
+                            }
+                            if (def.dataType === 'BOOLEAN') {
+                                optionsSet.add('Yes');
+                                optionsSet.add('No');
+                            }
+                            attributesMap.set(rawKey, {
+                                key: rawKey,
+                                displayName: def.displayName || rawKey,
+                                dataType: def.dataType || 'STRING',
+                                options: optionsSet,
+                                isFilterable: def.isSurveyFilterable !== false,
+                                source: 'METAMODEL',
+                            });
+                        }
+                    }
+                }
+                // 2. Query Tenant Employees strictly isolated by projectId
                 const { EmployeeModel } = await Promise.resolve().then(() => __importStar(require('../../../employee/infrastructure/persistence/mongoose/employee.schema')));
                 const employees = await EmployeeModel.find({
-                    $or: [{ projectId }, { projectId: { $exists: true } }],
+                    projectId,
                     isDeleted: { $ne: true },
                 }).lean();
                 for (const emp of employees) {
-                    if (emp.department && typeof emp.department === 'string')
+                    if (emp.department && typeof emp.department === 'string' && emp.department.trim()) {
                         departments.add(emp.department.trim());
-                    if (emp.title && typeof emp.title === 'string')
+                    }
+                    if (emp.title && typeof emp.title === 'string' && emp.title.trim()) {
                         jobTitles.add(emp.title.trim());
+                    }
+                    if (emp.workArrangement && typeof emp.workArrangement === 'string' && emp.workArrangement.trim()) {
+                        workArrangements.add(emp.workArrangement.trim());
+                    }
+                    if (emp.employmentType && typeof emp.employmentType === 'string' && emp.employmentType.trim()) {
+                        employmentTypes.add(emp.employmentType.trim());
+                    }
                     const attrs = emp.attributes || emp.customAttributes || {};
                     for (const [k, rawVal] of Object.entries(attrs)) {
                         if (rawVal == null)
                             continue;
-                        const val = String(rawVal).trim();
+                        let val = String(rawVal).trim();
                         if (!val || val === 'ALL')
                             continue;
+                        if (val.toLowerCase() === 'true')
+                            val = 'Yes';
+                        else if (val.toLowerCase() === 'false')
+                            val = 'No';
+                        // Match against tenant settings metamodel attributes
+                        const matchingAttrKey = Array.from(attributesMap.keys()).find((ak) => ak.toLowerCase() === k.toLowerCase());
+                        if (matchingAttrKey) {
+                            attributesMap.get(matchingAttrKey).options.add(val);
+                        }
                         const kLower = k.toLowerCase().replace(/[\s_-]/g, '');
                         if (kLower === 'department') {
                             departments.add(val);
@@ -663,7 +750,7 @@ class GetDashboardMetricsUseCase {
                         else if (kLower === 'title' || kLower === 'jobtitle') {
                             jobTitles.add(val);
                         }
-                        else {
+                        else if (!matchingAttrKey) {
                             if (!customDimensionsMap.has(k)) {
                                 customDimensionsMap.set(k, new Set());
                             }
@@ -671,22 +758,29 @@ class GetDashboardMetricsUseCase {
                         }
                     }
                 }
-                // Also extract from survey responses
+                // 3. Extract Demographic Data from Survey Responses (for when employee roster metadata was omitted)
                 const { SurveyResponseModel } = await Promise.resolve().then(() => __importStar(require('../../../response-intake/infrastructure/persistence/mongoose/survey-response.schema')));
-                const query = { isDeleted: { $ne: true } };
+                const query = { projectId, isDeleted: { $ne: true } };
                 if (campaignId)
                     query.campaignId = campaignId;
-                else if (projectId)
-                    query.projectId = projectId;
-                const responses = await SurveyResponseModel.find(query).limit(500).lean();
+                const responses = await SurveyResponseModel.find(query).limit(1000).lean();
                 for (const r of responses) {
                     const snapshot = r.demographicSnapshot || {};
                     for (const [k, rawVal] of Object.entries(snapshot)) {
                         if (rawVal == null)
                             continue;
-                        const val = String(rawVal).trim();
+                        let val = String(rawVal).trim();
                         if (!val || val === 'ALL')
                             continue;
+                        if (val.toLowerCase() === 'true')
+                            val = 'Yes';
+                        else if (val.toLowerCase() === 'false')
+                            val = 'No';
+                        // Match against tenant metamodel
+                        const matchingAttrKey = Array.from(attributesMap.keys()).find((ak) => ak.toLowerCase() === k.toLowerCase());
+                        if (matchingAttrKey) {
+                            attributesMap.get(matchingAttrKey).options.add(val);
+                        }
                         const kLower = k.toLowerCase().replace(/[\s_-]/g, '');
                         if (kLower === 'department') {
                             departments.add(val);
@@ -703,7 +797,7 @@ class GetDashboardMetricsUseCase {
                         else if (kLower === 'title' || kLower === 'jobtitle') {
                             jobTitles.add(val);
                         }
-                        else {
+                        else if (!matchingAttrKey) {
                             if (!customDimensionsMap.has(k)) {
                                 customDimensionsMap.set(k, new Set());
                             }
@@ -716,21 +810,83 @@ class GetDashboardMetricsUseCase {
                 // Fallback gracefully
             }
         }
-        // Default enterprise fallbacks if database has sparse records
-        if (departments.size === 0) {
-            ['Human Resources', 'Engineering & IT', 'Marketing & Communications', 'Finance & Accounting', 'Operations & Logistics', 'Sales & Customer Success'].forEach((d) => departments.add(d));
+        // 4. Assemble attributes list: Metamodel attributes first, followed by discovered tenant dimensions
+        const attributesList = [];
+        // Add metamodel attributes from tenant settings
+        for (const attr of attributesMap.values()) {
+            attributesList.push({
+                key: attr.key,
+                displayName: attr.displayName,
+                dataType: attr.dataType,
+                options: Array.from(attr.options).sort(),
+                isFilterable: attr.isFilterable,
+                source: 'METAMODEL',
+            });
         }
-        if (tenures.size === 0) {
-            ['< 1 Year', '1–2 Years', '2–5 Years', '5+ Years', '10+ Years'].forEach((t) => tenures.add(t));
+        // Add standard employee roster attributes if present in this tenant and not already in metamodel
+        const hasAttrCase = (keyName) => attributesList.some((a) => a.key.toLowerCase() === keyName.toLowerCase());
+        if (departments.size > 0 && !hasAttrCase('department')) {
+            attributesList.push({
+                key: 'department',
+                displayName: 'Department',
+                dataType: 'ENUM',
+                options: Array.from(departments).sort(),
+                isFilterable: true,
+                source: 'ROSTER_DISCOVERED',
+            });
         }
-        if (workArrangements.size === 0) {
-            ['On-site', 'Hybrid', 'Remote'].forEach((w) => workArrangements.add(w));
+        if (jobTitles.size > 0 && !hasAttrCase('jobTitle') && !hasAttrCase('title')) {
+            attributesList.push({
+                key: 'jobTitle',
+                displayName: 'Job Title / Role',
+                dataType: 'STRING',
+                options: Array.from(jobTitles).sort(),
+                isFilterable: true,
+                source: 'ROSTER_DISCOVERED',
+            });
         }
-        if (employmentTypes.size === 0) {
-            ['Full-time', 'Part-time', 'Contract', 'Intern'].forEach((e) => employmentTypes.add(e));
+        if (tenures.size > 0 && !hasAttrCase('tenure') && !hasAttrCase('tenureGroup')) {
+            attributesList.push({
+                key: 'tenure',
+                displayName: 'Tenure / Length of Service',
+                dataType: 'ENUM',
+                options: Array.from(tenures).sort(),
+                isFilterable: true,
+                source: 'ROSTER_DISCOVERED',
+            });
         }
-        if (jobTitles.size === 0) {
-            ['Software Engineer', 'Product Manager', 'HR Executive', 'Data Analyst', 'Team Lead', 'Director'].forEach((j) => jobTitles.add(j));
+        if (workArrangements.size > 0 && !hasAttrCase('workArrangement') && !hasAttrCase('remoteStatus')) {
+            attributesList.push({
+                key: 'workArrangement',
+                displayName: 'Work Arrangement',
+                dataType: 'ENUM',
+                options: Array.from(workArrangements).sort(),
+                isFilterable: true,
+                source: 'ROSTER_DISCOVERED',
+            });
+        }
+        if (employmentTypes.size > 0 && !hasAttrCase('employmentType')) {
+            attributesList.push({
+                key: 'employmentType',
+                displayName: 'Employment Type',
+                dataType: 'ENUM',
+                options: Array.from(employmentTypes).sort(),
+                isFilterable: true,
+                source: 'ROSTER_DISCOVERED',
+            });
+        }
+        // Add remaining custom dimensions discovered from tenant responses or employee records
+        for (const [k, vals] of customDimensionsMap.entries()) {
+            if (!hasAttrCase(k) && vals.size > 0) {
+                attributesList.push({
+                    key: k,
+                    displayName: k.replace(/([A-Z])/g, ' $1').trim(),
+                    dataType: 'STRING',
+                    options: Array.from(vals).sort(),
+                    isFilterable: true,
+                    source: 'ROSTER_DISCOVERED',
+                });
+            }
         }
         const customDimensions = {};
         for (const [k, vals] of customDimensionsMap.entries()) {
@@ -745,6 +901,7 @@ class GetDashboardMetricsUseCase {
             employmentTypes: Array.from(employmentTypes).sort(),
             jobTitles: Array.from(jobTitles).sort(),
             customDimensions,
+            attributes: attributesList,
         };
     }
 }

@@ -69,6 +69,7 @@ function createProjectConfigRouter(repo, cacheRepo) {
     router.post('/projects', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([auth_middleware_1.UserRole.SUPER_ADMIN, auth_middleware_1.UserRole.CONSULTANT_DAASH, auth_middleware_1.UserRole.CONSULTANT]), controller.createProject);
     router.get('/projects', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([
         auth_middleware_1.UserRole.SUPER_ADMIN,
+        auth_middleware_1.UserRole.ORG_ADMIN,
         auth_middleware_1.UserRole.PROJECT_ADMIN,
         auth_middleware_1.UserRole.CONSULTANT_DAASH,
         auth_middleware_1.UserRole.CONSULTANT,
@@ -77,8 +78,8 @@ function createProjectConfigRouter(repo, cacheRepo) {
         auth_middleware_1.UserRole.SURVEY_AUTHOR,
         auth_middleware_1.UserRole.REPORT_VIEWER,
     ]), controller.listProjects);
-    router.get('/projects/:projectId', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([auth_middleware_1.UserRole.SUPER_ADMIN, auth_middleware_1.UserRole.PROJECT_ADMIN, auth_middleware_1.UserRole.CONSULTANT_DAASH, auth_middleware_1.UserRole.CONSULTANT]), controller.getProject);
-    router.put('/projects/:projectId', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([auth_middleware_1.UserRole.SUPER_ADMIN, auth_middleware_1.UserRole.PROJECT_ADMIN, auth_middleware_1.UserRole.CONSULTANT_DAASH, auth_middleware_1.UserRole.CONSULTANT,]), controller.updateProject);
+    router.get('/projects/:projectId', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([auth_middleware_1.UserRole.SUPER_ADMIN, auth_middleware_1.UserRole.ORG_ADMIN, auth_middleware_1.UserRole.PROJECT_ADMIN, auth_middleware_1.UserRole.CONSULTANT_DAASH, auth_middleware_1.UserRole.CONSULTANT]), controller.getProject);
+    router.put('/projects/:projectId', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([auth_middleware_1.UserRole.SUPER_ADMIN, auth_middleware_1.UserRole.ORG_ADMIN, auth_middleware_1.UserRole.PROJECT_ADMIN, auth_middleware_1.UserRole.CONSULTANT_DAASH, auth_middleware_1.UserRole.CONSULTANT]), controller.updateProject);
     router.patch('/projects/:projectId/features', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([auth_middleware_1.UserRole.SUPER_ADMIN]), controller.toggleFeatures);
     router.delete('/projects/:projectId', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([auth_middleware_1.UserRole.SUPER_ADMIN]), controller.deleteProject);
     // 2b. Presigned S3 Asset Upload for Brand Logos & Themes (GAP-012 / TASK-06-02)
@@ -155,7 +156,7 @@ function createProjectConfigRouter(repo, cacheRepo) {
             next(err);
         }
     });
-    router.put('/projects/:projectId/config/email', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([auth_middleware_1.UserRole.SUPER_ADMIN, auth_middleware_1.UserRole.PROJECT_ADMIN, auth_middleware_1.UserRole.CONSULTANT_DAASH, auth_middleware_1.UserRole.CONSULTANT]), async (req, res, next) => {
+    router.put('/projects/:projectId/config/email', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([auth_middleware_1.UserRole.SUPER_ADMIN, auth_middleware_1.UserRole.ORG_ADMIN, auth_middleware_1.UserRole.PROJECT_ADMIN, auth_middleware_1.UserRole.CONSULTANT_DAASH, auth_middleware_1.UserRole.CONSULTANT]), async (req, res, next) => {
         try {
             const { projectId } = req.params;
             const project = await repository.findByProjectId(projectId);
@@ -169,10 +170,10 @@ function createProjectConfigRouter(repo, cacheRepo) {
             }
             const incoming = req.body || {};
             const existingEmail = project.emailConfigVO;
-            if (incoming.zeptoMailApiKey && incoming.zeptoMailApiKey.startsWith('••••')) {
+            if (!incoming.zeptoMailApiKey || incoming.zeptoMailApiKey.includes('••••')) {
                 incoming.zeptoMailApiKey = existingEmail.zeptoMailApiKey;
             }
-            if (incoming.smtpPassword && incoming.smtpPassword.startsWith('••••')) {
+            if (!incoming.smtpPassword || incoming.smtpPassword.includes('••••')) {
                 incoming.smtpPassword = existingEmail.smtpPassword;
             }
             project.updateEmailConfig(incoming);
@@ -188,13 +189,33 @@ function createProjectConfigRouter(repo, cacheRepo) {
             next(err);
         }
     });
-    router.post('/projects/:projectId/config/email/test', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([auth_middleware_1.UserRole.SUPER_ADMIN, auth_middleware_1.UserRole.PROJECT_ADMIN, auth_middleware_1.UserRole.CONSULTANT_DAASH, auth_middleware_1.UserRole.CONSULTANT]), async (req, res, next) => {
+    router.post('/projects/:projectId/config/email/test', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([auth_middleware_1.UserRole.SUPER_ADMIN, auth_middleware_1.UserRole.ORG_ADMIN, auth_middleware_1.UserRole.PROJECT_ADMIN, auth_middleware_1.UserRole.CONSULTANT_DAASH, auth_middleware_1.UserRole.CONSULTANT]), async (req, res, next) => {
         try {
             const { projectId } = req.params;
             const { recipientEmail, config } = req.body || {};
             const project = await repository.findByProjectId(projectId);
             const targetRecipient = recipientEmail || req.user?.email || 'no-reply@talnova.io';
-            const effectiveConfig = config || project?.emailConfigVO.toJSON();
+            const savedConfig = project?.emailConfigVO.toJSON();
+            const effectiveConfig = {
+                ...(savedConfig || {}),
+                ...(config || {}),
+            };
+            // If smtpPassword is not provided or masked, restore from saved DB config or fallback to env for ZOHO_SMTP
+            if (!effectiveConfig.smtpPassword || effectiveConfig.smtpPassword.includes('••••')) {
+                effectiveConfig.smtpPassword = savedConfig?.smtpPassword || (effectiveConfig.provider === 'ZOHO_SMTP' ? process.env.SMTP_PASS : undefined);
+            }
+            // If zeptoMailApiKey is not provided or masked, restore from saved DB config
+            if (!effectiveConfig.zeptoMailApiKey || effectiveConfig.zeptoMailApiKey.includes('••••')) {
+                effectiveConfig.zeptoMailApiKey = savedConfig?.zeptoMailApiKey;
+            }
+            // If smtpUser is not provided, restore from saved DB config or fallback to env for ZOHO_SMTP
+            if (!effectiveConfig.smtpUser) {
+                effectiveConfig.smtpUser = savedConfig?.smtpUser || (effectiveConfig.provider === 'ZOHO_SMTP' ? process.env.SMTP_USER : undefined);
+            }
+            // If smtpHost is not provided, restore from saved DB config or default
+            if (!effectiveConfig.smtpHost && effectiveConfig.provider === 'ZOHO_SMTP') {
+                effectiveConfig.smtpHost = savedConfig?.smtpHost || process.env.SMTP_HOST || 'smtp.zoho.eu';
+            }
             const testResult = await email_gateway_service_1.emailGatewayService.testDiagnosticConnection(projectId, targetRecipient, effectiveConfig);
             res.status(200).json(testResult);
         }
@@ -203,7 +224,7 @@ function createProjectConfigRouter(repo, cacheRepo) {
         }
     });
     // 4. AI Engine & NLP Routing Endpoints (PROMPT-22)
-    router.get('/projects/:projectId/config/ai', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([auth_middleware_1.UserRole.SUPER_ADMIN, auth_middleware_1.UserRole.PROJECT_ADMIN, auth_middleware_1.UserRole.CONSULTANT_DAASH, auth_middleware_1.UserRole.CONSULTANT]), async (req, res, next) => {
+    router.get('/projects/:projectId/config/ai', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([auth_middleware_1.UserRole.SUPER_ADMIN, auth_middleware_1.UserRole.ORG_ADMIN, auth_middleware_1.UserRole.PROJECT_ADMIN, auth_middleware_1.UserRole.CONSULTANT_DAASH, auth_middleware_1.UserRole.CONSULTANT]), async (req, res, next) => {
         try {
             const { projectId } = req.params;
             const project = await repository.findByProjectId(projectId);
@@ -224,7 +245,7 @@ function createProjectConfigRouter(repo, cacheRepo) {
             next(err);
         }
     });
-    router.put('/projects/:projectId/config/ai', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([auth_middleware_1.UserRole.SUPER_ADMIN, auth_middleware_1.UserRole.PROJECT_ADMIN, auth_middleware_1.UserRole.CONSULTANT_DAASH, auth_middleware_1.UserRole.CONSULTANT]), async (req, res, next) => {
+    router.put('/projects/:projectId/config/ai', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([auth_middleware_1.UserRole.SUPER_ADMIN, auth_middleware_1.UserRole.ORG_ADMIN, auth_middleware_1.UserRole.PROJECT_ADMIN, auth_middleware_1.UserRole.CONSULTANT_DAASH, auth_middleware_1.UserRole.CONSULTANT]), async (req, res, next) => {
         try {
             const { projectId } = req.params;
             const project = await repository.findByProjectId(projectId);
@@ -264,7 +285,7 @@ function createProjectConfigRouter(repo, cacheRepo) {
             next(err);
         }
     });
-    router.post('/projects/:projectId/config/ai/test', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([auth_middleware_1.UserRole.SUPER_ADMIN, auth_middleware_1.UserRole.PROJECT_ADMIN, auth_middleware_1.UserRole.CONSULTANT_DAASH, auth_middleware_1.UserRole.CONSULTANT]), async (req, res, next) => {
+    router.post('/projects/:projectId/config/ai/test', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([auth_middleware_1.UserRole.SUPER_ADMIN, auth_middleware_1.UserRole.ORG_ADMIN, auth_middleware_1.UserRole.PROJECT_ADMIN, auth_middleware_1.UserRole.CONSULTANT_DAASH, auth_middleware_1.UserRole.CONSULTANT]), async (req, res, next) => {
         try {
             const { projectId } = req.params;
             const { testPrompt, config } = req.body || {};
@@ -399,7 +420,7 @@ function createProjectConfigRouter(repo, cacheRepo) {
         }
     });
     // 5. Custom Domain & SAML SSO Verification Endpoints (GAP-015 / TASK-04-02)
-    router.post('/projects/:projectId/verify-domain', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([auth_middleware_1.UserRole.SUPER_ADMIN, auth_middleware_1.UserRole.PROJECT_ADMIN, auth_middleware_1.UserRole.CONSULTANT_DAASH, auth_middleware_1.UserRole.CONSULTANT]), async (req, res, next) => {
+    router.post('/projects/:projectId/verify-domain', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([auth_middleware_1.UserRole.SUPER_ADMIN, auth_middleware_1.UserRole.ORG_ADMIN, auth_middleware_1.UserRole.PROJECT_ADMIN, auth_middleware_1.UserRole.CONSULTANT_DAASH, auth_middleware_1.UserRole.CONSULTANT]), async (req, res, next) => {
         try {
             const { projectId } = req.params;
             const project = await repository.findByProjectId(projectId);
@@ -490,7 +511,7 @@ function createProjectConfigRouter(repo, cacheRepo) {
             next(err);
         }
     });
-    router.get('/projects/:projectId/config/security', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([auth_middleware_1.UserRole.SUPER_ADMIN, auth_middleware_1.UserRole.PROJECT_ADMIN, auth_middleware_1.UserRole.CONSULTANT_DAASH, auth_middleware_1.UserRole.CONSULTANT]), async (req, res, next) => {
+    router.get('/projects/:projectId/config/security', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([auth_middleware_1.UserRole.SUPER_ADMIN, auth_middleware_1.UserRole.ORG_ADMIN, auth_middleware_1.UserRole.PROJECT_ADMIN, auth_middleware_1.UserRole.CONSULTANT_DAASH, auth_middleware_1.UserRole.CONSULTANT]), async (req, res, next) => {
         try {
             const { projectId } = req.params;
             const project = await repository.findByProjectId(projectId);
@@ -529,7 +550,7 @@ function createProjectConfigRouter(repo, cacheRepo) {
             next(err);
         }
     });
-    router.put('/projects/:projectId/config/security', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([auth_middleware_1.UserRole.SUPER_ADMIN, auth_middleware_1.UserRole.PROJECT_ADMIN, auth_middleware_1.UserRole.CONSULTANT_DAASH, auth_middleware_1.UserRole.CONSULTANT]), async (req, res, next) => {
+    router.put('/projects/:projectId/config/security', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([auth_middleware_1.UserRole.SUPER_ADMIN, auth_middleware_1.UserRole.ORG_ADMIN, auth_middleware_1.UserRole.PROJECT_ADMIN, auth_middleware_1.UserRole.CONSULTANT_DAASH, auth_middleware_1.UserRole.CONSULTANT]), async (req, res, next) => {
         try {
             const { projectId } = req.params;
             const project = await repository.findByProjectId(projectId);
