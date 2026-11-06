@@ -1,7 +1,10 @@
 import { AuditLogProps } from '../../domain/entities/audit-log.entity';
 import { AuditLogDocument } from '../../infrastructure/persistence/mongoose/audit-log.schema';
 export interface AuditLogQueryParams {
+    module?: string;
     projectId?: string;
+    firmId?: string;
+    organizationId?: string;
     action?: string;
     resourceType?: string;
     actorId?: string;
@@ -19,7 +22,10 @@ export interface AuditLogQueryResult {
     data: Array<{
         id: string;
         eventId: string;
+        module?: string;
         projectId: string;
+        firmId?: string;
+        organizationId?: string;
         actorId: string;
         actorRole: string;
         action: string;
@@ -33,10 +39,12 @@ export interface AuditLogQueryResult {
 export declare class AuditLogService {
     private static instance;
     private isSubscribed;
+    private inMemoryModuleLogs;
     static getInstance(): AuditLogService;
     constructor();
     initDomainEventListener(): void;
     recordAuditLog(props: AuditLogProps): Promise<AuditLogDocument | null>;
+    getInMemoryModuleLogs(moduleName?: string): Array<Record<string, any>>;
     private handleDomainEvent;
     queryLogs(params: AuditLogQueryParams): Promise<AuditLogQueryResult>;
     seedDefaultsIfEmpty(projectId: string): Promise<void>;

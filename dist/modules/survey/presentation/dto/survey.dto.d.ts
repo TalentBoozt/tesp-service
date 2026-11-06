@@ -747,14 +747,14 @@ export declare const SaveSurveyDraftSchema: z.ZodObject<{
         }[];
         title?: Record<string, string> | undefined;
     }[];
-    version?: number | undefined;
     description?: Record<string, string> | undefined;
+    version?: number | undefined;
 }, {
     projectId: string;
     surveyId: string;
     title: Record<string, string>;
-    version?: number | undefined;
     description?: Record<string, string> | undefined;
+    version?: number | undefined;
     pages?: {
         pageId: string;
         pageOrder: number;

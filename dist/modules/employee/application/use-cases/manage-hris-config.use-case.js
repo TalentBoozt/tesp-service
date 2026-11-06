@@ -42,7 +42,7 @@ class ManageHrisConfigUseCase {
         };
         if (dto.clientId !== undefined)
             updateData.clientId = dto.clientId;
-        if (dto.clientSecret !== undefined && dto.clientSecret !== '••••••••••••••••') {
+        if (dto.clientSecret !== undefined && dto.clientSecret !== '••••••••••••••••' && !dto.clientSecret.includes('••••')) {
             updateData.clientSecret = dto.clientSecret;
         }
         const doc = await hris_config_model_1.HrisConfigModel.findOneAndUpdate({ projectId }, { $set: updateData }, { upsert: true, new: true, runValidators: true });

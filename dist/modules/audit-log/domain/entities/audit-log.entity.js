@@ -8,7 +8,10 @@ const crypto_1 = __importDefault(require("crypto"));
 class AuditLogEntity {
     id;
     eventId;
+    module;
     projectId;
+    firmId;
+    organizationId;
     actorId;
     actorRole;
     action;
@@ -20,7 +23,10 @@ class AuditLogEntity {
     constructor(props) {
         this.id = props.id;
         this.eventId = props.eventId || crypto_1.default.randomUUID();
+        this.module = props.module || 'ENTERPRISE_SURVEY';
         this.projectId = props.projectId;
+        this.firmId = props.firmId;
+        this.organizationId = props.organizationId;
         this.actorId = props.actorId || 'SYSTEM';
         this.actorRole = props.actorRole || 'SYSTEM_DAEMON';
         this.action = props.action;
@@ -34,7 +40,10 @@ class AuditLogEntity {
         return {
             id: this.id || this.eventId,
             eventId: this.eventId,
-            projectId: this.projectId,
+            module: this.module,
+            ...(this.projectId ? { projectId: this.projectId } : {}),
+            ...(this.firmId ? { firmId: this.firmId } : {}),
+            ...(this.organizationId ? { organizationId: this.organizationId } : {}),
             actorId: this.actorId,
             actorRole: this.actorRole,
             action: this.action,

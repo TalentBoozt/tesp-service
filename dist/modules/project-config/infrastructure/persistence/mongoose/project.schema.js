@@ -101,8 +101,11 @@ const ProjectSchema = new mongoose_1.Schema({
         {
             key: { type: String, required: true },
             displayName: { type: String, required: true },
-            dataType: { type: String, enum: ['STRING', 'NUMERIC', 'ENUM', 'DATE'], required: true },
+            dataType: { type: String, enum: ['STRING', 'NUMERIC', 'ENUM', 'DATE', 'BOOLEAN'], required: true },
             allowedValues: [{ type: String }],
+            isRequired: { type: Boolean, default: false },
+            isSurveyFilterable: { type: Boolean, default: true },
+            description: { type: String },
         },
     ],
     tenantId: { type: String, index: true },

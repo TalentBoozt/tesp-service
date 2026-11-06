@@ -2,19 +2,19 @@ import { z } from 'zod';
 import { AnonymityLevel } from '../../../survey-distribution/domain/entities/campaign.entity';
 export declare const SubmitAnswerDtoSchema: z.ZodObject<{
     questionId: z.ZodString;
-    questionType: z.ZodEnum<["LIKERT", "NPS", "RATING", "SINGLE_CHOICE", "MULTI_CHOICE", "SHORT_TEXT", "LONG_TEXT", "SLIDER", "RANKING", "MATRIX"]>;
+    questionType: z.ZodEnum<["LIKERT", "LIKERT_5", "LIKERT_7", "NPS", "NPS_11", "RATING", "RATING_STAR", "SINGLE_CHOICE", "MULTI_CHOICE", "MULTIPLE_CHOICE", "SHORT_TEXT", "LONG_TEXT", "TEXT", "TEXT_SHORT", "TEXT_LONG", "SLIDER", "RANKING", "MATRIX", "NUMERIC", "DATE"]>;
     numericValue: z.ZodOptional<z.ZodNumber>;
     textValue: z.ZodOptional<z.ZodString>;
     selectedOptions: z.ZodOptional<z.ZodArray<z.ZodString, "many">>;
 }, "strip", z.ZodTypeAny, {
     questionId: string;
-    questionType: "LIKERT" | "NPS" | "MATRIX" | "SINGLE_CHOICE" | "RANKING" | "SHORT_TEXT" | "LONG_TEXT" | "RATING" | "MULTI_CHOICE" | "SLIDER";
+    questionType: "NUMERIC" | "DATE" | "LIKERT" | "NPS" | "MATRIX" | "SINGLE_CHOICE" | "MULTIPLE_CHOICE" | "RANKING" | "SHORT_TEXT" | "LONG_TEXT" | "RATING" | "MULTI_CHOICE" | "SLIDER" | "LIKERT_5" | "LIKERT_7" | "NPS_11" | "RATING_STAR" | "TEXT" | "TEXT_SHORT" | "TEXT_LONG";
     numericValue?: number | undefined;
     textValue?: string | undefined;
     selectedOptions?: string[] | undefined;
 }, {
     questionId: string;
-    questionType: "LIKERT" | "NPS" | "MATRIX" | "SINGLE_CHOICE" | "RANKING" | "SHORT_TEXT" | "LONG_TEXT" | "RATING" | "MULTI_CHOICE" | "SLIDER";
+    questionType: "NUMERIC" | "DATE" | "LIKERT" | "NPS" | "MATRIX" | "SINGLE_CHOICE" | "MULTIPLE_CHOICE" | "RANKING" | "SHORT_TEXT" | "LONG_TEXT" | "RATING" | "MULTI_CHOICE" | "SLIDER" | "LIKERT_5" | "LIKERT_7" | "NPS_11" | "RATING_STAR" | "TEXT" | "TEXT_SHORT" | "TEXT_LONG";
     numericValue?: number | undefined;
     textValue?: string | undefined;
     selectedOptions?: string[] | undefined;
@@ -31,19 +31,19 @@ export declare const SubmitResponseDtoSchema: z.ZodObject<{
     demographicSnapshot: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodAny>>;
     answers: z.ZodArray<z.ZodObject<{
         questionId: z.ZodString;
-        questionType: z.ZodEnum<["LIKERT", "NPS", "RATING", "SINGLE_CHOICE", "MULTI_CHOICE", "SHORT_TEXT", "LONG_TEXT", "SLIDER", "RANKING", "MATRIX"]>;
+        questionType: z.ZodEnum<["LIKERT", "LIKERT_5", "LIKERT_7", "NPS", "NPS_11", "RATING", "RATING_STAR", "SINGLE_CHOICE", "MULTI_CHOICE", "MULTIPLE_CHOICE", "SHORT_TEXT", "LONG_TEXT", "TEXT", "TEXT_SHORT", "TEXT_LONG", "SLIDER", "RANKING", "MATRIX", "NUMERIC", "DATE"]>;
         numericValue: z.ZodOptional<z.ZodNumber>;
         textValue: z.ZodOptional<z.ZodString>;
         selectedOptions: z.ZodOptional<z.ZodArray<z.ZodString, "many">>;
     }, "strip", z.ZodTypeAny, {
         questionId: string;
-        questionType: "LIKERT" | "NPS" | "MATRIX" | "SINGLE_CHOICE" | "RANKING" | "SHORT_TEXT" | "LONG_TEXT" | "RATING" | "MULTI_CHOICE" | "SLIDER";
+        questionType: "NUMERIC" | "DATE" | "LIKERT" | "NPS" | "MATRIX" | "SINGLE_CHOICE" | "MULTIPLE_CHOICE" | "RANKING" | "SHORT_TEXT" | "LONG_TEXT" | "RATING" | "MULTI_CHOICE" | "SLIDER" | "LIKERT_5" | "LIKERT_7" | "NPS_11" | "RATING_STAR" | "TEXT" | "TEXT_SHORT" | "TEXT_LONG";
         numericValue?: number | undefined;
         textValue?: string | undefined;
         selectedOptions?: string[] | undefined;
     }, {
         questionId: string;
-        questionType: "LIKERT" | "NPS" | "MATRIX" | "SINGLE_CHOICE" | "RANKING" | "SHORT_TEXT" | "LONG_TEXT" | "RATING" | "MULTI_CHOICE" | "SLIDER";
+        questionType: "NUMERIC" | "DATE" | "LIKERT" | "NPS" | "MATRIX" | "SINGLE_CHOICE" | "MULTIPLE_CHOICE" | "RANKING" | "SHORT_TEXT" | "LONG_TEXT" | "RATING" | "MULTI_CHOICE" | "SLIDER" | "LIKERT_5" | "LIKERT_7" | "NPS_11" | "RATING_STAR" | "TEXT" | "TEXT_SHORT" | "TEXT_LONG";
         numericValue?: number | undefined;
         textValue?: string | undefined;
         selectedOptions?: string[] | undefined;
@@ -56,7 +56,7 @@ export declare const SubmitResponseDtoSchema: z.ZodObject<{
     respondentType: AnonymityLevel;
     answers: {
         questionId: string;
-        questionType: "LIKERT" | "NPS" | "MATRIX" | "SINGLE_CHOICE" | "RANKING" | "SHORT_TEXT" | "LONG_TEXT" | "RATING" | "MULTI_CHOICE" | "SLIDER";
+        questionType: "NUMERIC" | "DATE" | "LIKERT" | "NPS" | "MATRIX" | "SINGLE_CHOICE" | "MULTIPLE_CHOICE" | "RANKING" | "SHORT_TEXT" | "LONG_TEXT" | "RATING" | "MULTI_CHOICE" | "SLIDER" | "LIKERT_5" | "LIKERT_7" | "NPS_11" | "RATING_STAR" | "TEXT" | "TEXT_SHORT" | "TEXT_LONG";
         numericValue?: number | undefined;
         textValue?: string | undefined;
         selectedOptions?: string[] | undefined;
@@ -72,7 +72,7 @@ export declare const SubmitResponseDtoSchema: z.ZodObject<{
     respondentType: AnonymityLevel;
     answers: {
         questionId: string;
-        questionType: "LIKERT" | "NPS" | "MATRIX" | "SINGLE_CHOICE" | "RANKING" | "SHORT_TEXT" | "LONG_TEXT" | "RATING" | "MULTI_CHOICE" | "SLIDER";
+        questionType: "NUMERIC" | "DATE" | "LIKERT" | "NPS" | "MATRIX" | "SINGLE_CHOICE" | "MULTIPLE_CHOICE" | "RANKING" | "SHORT_TEXT" | "LONG_TEXT" | "RATING" | "MULTI_CHOICE" | "SLIDER" | "LIKERT_5" | "LIKERT_7" | "NPS_11" | "RATING_STAR" | "TEXT" | "TEXT_SHORT" | "TEXT_LONG";
         numericValue?: number | undefined;
         textValue?: string | undefined;
         selectedOptions?: string[] | undefined;

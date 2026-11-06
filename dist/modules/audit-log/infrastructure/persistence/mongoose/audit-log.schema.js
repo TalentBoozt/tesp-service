@@ -52,7 +52,10 @@ const AuditLogSchema = new mongoose_1.Schema({
         },
         index: true,
     },
-    projectId: { type: String, required: true, index: true },
+    module: { type: String, default: 'ENTERPRISE_SURVEY', index: true },
+    projectId: { type: String, required: false, index: true },
+    firmId: { type: String, required: false, index: true },
+    organizationId: { type: String, required: false, index: true },
     actorId: { type: String, required: true, index: true },
     actorRole: { type: String, required: true },
     action: { type: String, required: true, index: true },
@@ -92,5 +95,7 @@ const AuditLogSchema = new mongoose_1.Schema({
 });
 AuditLogSchema.index({ projectId: 1, timestamp: -1 });
 AuditLogSchema.index({ action: 1, timestamp: -1 });
+AuditLogSchema.index({ module: 1, timestamp: -1 });
+AuditLogSchema.index({ module: 1, actorId: 1, timestamp: -1 });
 exports.AuditLogModel = mongoose_1.default.models.AuditLog || mongoose_1.default.model('AuditLog', AuditLogSchema);
 //# sourceMappingURL=audit-log.schema.js.map

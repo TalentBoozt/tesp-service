@@ -20,9 +20,10 @@ class ZeptoMailDispatcher {
     async sendMail(req) {
         const region = req.region || 'US';
         const endpoint = ZeptoMailDispatcher.getEndpoint(region);
+        const effectiveApiKey = (req.apiKey && !req.apiKey.includes('••••') ? req.apiKey : undefined) || process.env.ZEPTOMAIL_API_KEY || '';
         // If apiKey is a placeholder, simulated, or missing in test environments, simulate delivery
         const isProd = process.env.NODE_ENV === 'production';
-        const isMock = !req.apiKey || req.apiKey.startsWith('mock') || req.apiKey.startsWith('••••') || req.apiKey.includes('placeholder');
+        const isMock = !effectiveApiKey || effectiveApiKey.startsWith('mock') || effectiveApiKey.includes('••••') || effectiveApiKey.includes('placeholder');
         if (isProd && isMock) {
             return {
                 success: false,
@@ -68,7 +69,7 @@ class ZeptoMailDispatcher {
             const response = await fetch(endpoint, {
                 method: 'POST',
                 headers: {
-                    'Authorization': `Zoho-enczapikey ${req.apiKey}`,
+                    'Authorization': `Zoho-enczapikey ${effectiveApiKey}`,
                     'Content-Type': 'application/json',
                     'Accept': 'application/json',
                 },

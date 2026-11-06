@@ -23,8 +23,10 @@ class SmtpDispatcher {
             port = req.port || 587;
             secure = port === 465;
         }
-        const user = req.user || (req.provider === 'ZOHO_SMTP' ? process.env.SMTP_USER : undefined);
-        const pass = req.password || (req.provider === 'ZOHO_SMTP' ? process.env.SMTP_PASS : undefined);
+        const rawUser = req.user && !req.user.includes('••••') ? req.user : undefined;
+        const rawPass = req.password && !req.password.includes('••••') ? req.password : undefined;
+        const user = rawUser || (req.provider === 'ZOHO_SMTP' ? process.env.SMTP_USER : undefined);
+        const pass = rawPass || (req.provider === 'ZOHO_SMTP' ? process.env.SMTP_PASS : undefined);
         const auth = user && pass ? { user, pass } : undefined;
         return { host, port, secure, auth };
     }
@@ -32,17 +34,19 @@ class SmtpDispatcher {
      * Sends an email via SMTP.
      */
     async sendMail(req) {
-        const effectivePass = req.password || (req.provider === 'ZOHO_SMTP' ? process.env.SMTP_PASS : undefined);
-        const effectiveUser = req.user || (req.provider === 'ZOHO_SMTP' ? process.env.SMTP_USER : undefined);
+        const rawPass = req.password && !req.password.includes('••••') ? req.password : undefined;
+        const effectivePass = rawPass || (req.provider === 'ZOHO_SMTP' ? process.env.SMTP_PASS : undefined);
+        const rawUser = req.user && !req.user.includes('••••') ? req.user : undefined;
+        const effectiveUser = rawUser || (req.provider === 'ZOHO_SMTP' ? process.env.SMTP_USER : undefined);
         const isProd = process.env.NODE_ENV === 'production';
         const isMock = !isProd &&
             (process.env.NODE_ENV === 'test' ||
                 !effectivePass ||
-                effectivePass.startsWith('••••') ||
+                effectivePass.includes('••••') ||
                 effectivePass.startsWith('mock') ||
                 !effectiveUser ||
                 effectiveUser.includes('mock'));
-        if (isProd && (!effectivePass || !effectiveUser || effectivePass.startsWith('••••') || effectivePass.startsWith('mock') || effectiveUser.includes('mock'))) {
+        if (isProd && (!effectivePass || !effectiveUser || effectivePass.includes('••••') || effectivePass.startsWith('mock') || effectiveUser.includes('mock'))) {
             return {
                 success: false,
                 error: `MISSING_SMTP_CREDENTIALS: SMTP credentials not configured for provider ${req.provider} in production environment`,
@@ -97,17 +101,19 @@ class SmtpDispatcher {
      * Performs an SMTP handshake and authentication check without sending email.
      */
     async verifyConnection(req) {
-        const effectivePass = req.password || (req.provider === 'ZOHO_SMTP' ? process.env.SMTP_PASS : undefined);
-        const effectiveUser = req.user || (req.provider === 'ZOHO_SMTP' ? process.env.SMTP_USER : undefined);
+        const rawPass = req.password && !req.password.includes('••••') ? req.password : undefined;
+        const effectivePass = rawPass || (req.provider === 'ZOHO_SMTP' ? process.env.SMTP_PASS : undefined);
+        const rawUser = req.user && !req.user.includes('••••') ? req.user : undefined;
+        const effectiveUser = rawUser || (req.provider === 'ZOHO_SMTP' ? process.env.SMTP_USER : undefined);
         const isProd = process.env.NODE_ENV === 'production';
         const isMock = !isProd &&
             (process.env.NODE_ENV === 'test' ||
                 !effectivePass ||
-                effectivePass.startsWith('••••') ||
+                effectivePass.includes('••••') ||
                 effectivePass.startsWith('mock') ||
                 !effectiveUser ||
                 effectiveUser.includes('mock'));
-        if (isProd && (!effectivePass || !effectiveUser || effectivePass.startsWith('••••') || effectivePass.startsWith('mock') || effectiveUser.includes('mock'))) {
+        if (isProd && (!effectivePass || !effectiveUser || effectivePass.includes('••••') || effectivePass.startsWith('mock') || effectiveUser.includes('mock'))) {
             return {
                 success: false,
                 message: `SMTP Connection failed: Missing or invalid SMTP credentials for provider ${req.provider} in production environment`,

@@ -114,6 +114,8 @@ class SubmitSurveyResponseUseCase {
                     if (!matchedQ)
                         continue;
                     const isDemoQ = matchedQ.groupId === 'DEMOGRAPHICS' ||
+                        matchedQ.dimensionKey === 'DEMOGRAPHICS' ||
+                        matchedQ.category === 'DEMOGRAPHICS' ||
                         matchedQ.questionId.startsWith('Q-DEM');
                     if (!isDemoQ)
                         continue;
@@ -126,22 +128,46 @@ class SubmitSurveyResponseUseCase {
                     }
                     const lowerPrompt = promptText.toLowerCase();
                     let key = matchedQ.questionId.toLowerCase();
-                    if (lowerPrompt.includes('department'))
+                    // Resolve exact attribute key from question metadata or questionId
+                    if (matchedQ.attributeKey) {
+                        key = matchedQ.attributeKey;
+                    }
+                    else if (matchedQ.customAttributeKey) {
+                        key = matchedQ.customAttributeKey;
+                    }
+                    else if (matchedQ.questionId.startsWith('Q-DEM-')) {
+                        key = matchedQ.questionId.replace(/^Q-DEM-/, '');
+                    }
+                    else if (lowerPrompt.includes('department')) {
                         key = 'department';
-                    else if (lowerPrompt.includes('job title') || lowerPrompt.includes('title') || lowerPrompt.includes('role'))
+                    }
+                    else if (lowerPrompt.includes('job title') || lowerPrompt.includes('title') || lowerPrompt.includes('role')) {
                         key = 'jobTitle';
-                    else if (lowerPrompt.includes('tenure') || lowerPrompt.includes('length of service') || lowerPrompt.includes('service'))
+                    }
+                    else if (lowerPrompt.includes('tenure') || lowerPrompt.includes('length of service') || lowerPrompt.includes('service')) {
                         key = 'tenure';
-                    else if (lowerPrompt.includes('arrangement') || lowerPrompt.includes('work arrangement'))
+                    }
+                    else if (lowerPrompt.includes('arrangement') || lowerPrompt.includes('work arrangement')) {
                         key = 'workArrangement';
-                    else if (lowerPrompt.includes('employment type') || lowerPrompt.includes('contract'))
+                    }
+                    else if (lowerPrompt.includes('employment type') || lowerPrompt.includes('contract')) {
                         key = 'employmentType';
-                    else if (lowerPrompt.includes('gender'))
+                    }
+                    else if (lowerPrompt.includes('gender')) {
                         key = 'gender';
-                    else if (lowerPrompt.includes('location') || lowerPrompt.includes('office'))
-                        key = 'location';
-                    else if (lowerPrompt.includes('age'))
+                    }
+                    else if (lowerPrompt.includes('location') || lowerPrompt.includes('office') || lowerPrompt.includes('branch')) {
+                        key = 'WorkLocation';
+                    }
+                    else if (lowerPrompt.includes('shift')) {
+                        key = 'ShiftPattern';
+                    }
+                    else if (lowerPrompt.includes('manager') || lowerPrompt.includes('leader')) {
+                        key = 'IsManagement';
+                    }
+                    else if (lowerPrompt.includes('age')) {
                         key = 'ageGroup';
+                    }
                     const rawVal = ans.textValue || (ans.selectedOptions && ans.selectedOptions[0]) || ans.numericValue;
                     if (rawVal == null)
                         continue;
@@ -155,10 +181,21 @@ class SubmitSurveyResponseUseCase {
                                 displayVal = opt.label['en-US'] || Object.values(opt.label)[0] || rawVal;
                         }
                     }
-                    if (!sanitizedDemographicSnapshot[key]) {
-                        sanitizedDemographicSnapshot[key] = displayVal;
-                        sanitizedDemographicSnapshot[key.toLowerCase()] = displayVal;
-                    }
+                    sanitizedDemographicSnapshot[key] = displayVal;
+                    sanitizedDemographicSnapshot[key.toLowerCase()] = displayVal;
+                    const normLower = key.toLowerCase();
+                    if (normLower === 'department')
+                        sanitizedDemographicSnapshot['Department'] = displayVal;
+                    if (normLower === 'worklocation' || normLower === 'location')
+                        sanitizedDemographicSnapshot['WorkLocation'] = displayVal;
+                    if (normLower === 'workarrangement')
+                        sanitizedDemographicSnapshot['WorkArrangement'] = displayVal;
+                    if (normLower === 'shiftpattern')
+                        sanitizedDemographicSnapshot['ShiftPattern'] = displayVal;
+                    if (normLower === 'tenure')
+                        sanitizedDemographicSnapshot['Tenure'] = displayVal;
+                    if (normLower === 'ismanagement')
+                        sanitizedDemographicSnapshot['IsManagement'] = displayVal;
                 }
             }
             // 5. Generate Cryptographically Secure Response ID (GAP-025)
@@ -209,7 +246,7 @@ class SubmitSurveyResponseUseCase {
         catch (err) {
             // If token was reserved but subsequent validation or database persistence fails,
             // revert token reservation so user can correct answers and resubmit (GAP-004)
-            if (tokenBurned && dto.responseToken && this.tokenBurnUseCase && cachedPayload) {
+            if (tokenBurned && dto.responseToken && this.tokenBurnUseCase && typeof this.tokenBurnUseCase.restoreToken === 'function' && cachedPayload) {
                 await this.tokenBurnUseCase.restoreToken(dto.responseToken, cachedPayload);
             }
             throw err;
