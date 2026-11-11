@@ -1,6 +1,6 @@
 import { SupportedSocialStyleLanguage } from '../../../domain/constants/answer-key-v1.definition';
 import { InterpretationTemplatesCatalog } from '../../../domain/constants/style-interpretations.definition';
-import { FirstBillableLockState, ISocialStyleAnswerItem, NonBillableReason, SocialStyleAssessmentStatus, SocialStyleChargingPolicy, SocialStyleUsageCategory } from './social-styles.schemas';
+import { FirstBillableLockState, ISocialStyleAnswerItem, NonBillableReason, SocialStyleAssessmentSourceChannel, SocialStyleAssessmentStatus, SocialStyleChargingPolicy, SocialStyleInvitationEmailStatus, SocialStyleQrSessionStatus, SocialStyleUsageCategory } from './social-styles.schemas';
 import { AnswerBreakdownItem, SocialStyleFinalScores, SocialStyleRawScores } from '../../../domain/services/social-style-scoring.service';
 import { FourAxisProfileData, NetBalanceCoordinateData } from '../../../domain/services/social-style-graph.service';
 import { SocialStyleType } from '../../../domain/constants/answer-key-v1.definition';
@@ -23,6 +23,12 @@ export interface SocialStyleAssessmentRecord {
     language: SupportedSocialStyleLanguage;
     questionnaireVersion: string;
     status: SocialStyleAssessmentStatus;
+    sourceChannel?: SocialStyleAssessmentSourceChannel;
+    batchId?: string | null;
+    qrSessionId?: string | null;
+    invitationEmailStatus?: SocialStyleInvitationEmailStatus;
+    invitationEmailSentAt?: Date | null;
+    invitationEmailError?: string | null;
     publicTokenHash?: string;
     encryptedPublicToken?: string | null;
     tokenExpiresAt?: Date | null;
@@ -140,12 +146,40 @@ export interface SocialStyleConsultantSettingsRecord {
     createdAt: Date;
     updatedAt: Date;
 }
+export interface SocialStyleQrSessionRecord {
+    qrSessionId: string;
+    consultantId: string;
+    consultantName: string;
+    consultantEmail?: string;
+    firmId?: string;
+    firmName?: string;
+    organizationId?: string;
+    organizationName?: string;
+    title: string;
+    reference?: string;
+    consultantNotes?: string;
+    language: SupportedSocialStyleLanguage;
+    assessmentLinkExpiryDays: number;
+    status: SocialStyleQrSessionStatus;
+    sessionTokenHash: string;
+    encryptedSessionToken: string;
+    expiresAt?: Date | null;
+    maxParticipants?: number | null;
+    requirePhone: boolean;
+    sendBackupEmail: boolean;
+    registeredCount: number;
+    createdBy: string;
+    createdAt: Date;
+    updatedAt: Date;
+}
 export interface ListAssessmentsFilter {
     consultantId?: string;
     firmId?: string;
     status?: string;
     exportedFilter?: 'ALL' | 'EXPORTED' | 'NOT_EXPORTED';
     language?: string;
+    qrSessionId?: string;
+    batchId?: string;
     search?: string;
     sortBy?: 'createdAt' | 'completedAt' | 'participantName' | 'status';
     sortOrder?: 'asc' | 'desc';
@@ -179,6 +213,7 @@ export declare class SocialStylesRepository {
     private static sharedIdempotencyIndex;
     private static sharedFirstExportLockIndex;
     private static sharedConsultantSettings;
+    private static sharedQrSessions;
     private static sharedInterpretationCatalog;
     private static sharedFailNextLedgerInsertCount;
     private static sharedFailNextReportSaveCount;
@@ -190,6 +225,7 @@ export declare class SocialStylesRepository {
     private get idempotencyIndex();
     private get firstExportLockIndex();
     private get consultantSettings();
+    private get qrSessions();
     private get interpretationCatalog();
     private set interpretationCatalog(value);
     private get failNextLedgerInsertCount();
@@ -284,10 +320,18 @@ export declare class SocialStylesRepository {
     updateInterpretationTemplates(catalog: InterpretationTemplatesCatalog, updatedBy: string): Promise<InterpretationTemplatesCatalog>;
     getConsultantSettings(consultantId: string): Promise<SocialStyleConsultantSettingsRecord>;
     upsertConsultantSettings(consultantId: string, updates: Partial<Omit<SocialStyleConsultantSettingsRecord, 'consultantId' | 'createdAt' | 'updatedAt'>>, updatedBy: string): Promise<SocialStyleConsultantSettingsRecord>;
+    createQrSession(record: Omit<SocialStyleQrSessionRecord, 'createdAt' | 'updatedAt'>): Promise<SocialStyleQrSessionRecord>;
+    findQrSessionById(qrSessionId: string, consultantIdScope?: string): Promise<SocialStyleQrSessionRecord | null>;
+    findQrSessionByTokenHash(sessionTokenHash: string): Promise<SocialStyleQrSessionRecord | null>;
+    updateQrSession(qrSessionId: string, updates: Partial<SocialStyleQrSessionRecord>, consultantIdScope?: string): Promise<SocialStyleQrSessionRecord | null>;
+    listQrSessions(consultantIdScope?: string): Promise<SocialStyleQrSessionRecord[]>;
+    findAssessmentByQrSessionAndEmail(qrSessionId: string, participantEmail: string): Promise<SocialStyleAssessmentRecord | null>;
+    claimQrSessionSeatAtomic(qrSessionId: string): Promise<SocialStyleQrSessionRecord | null>;
     private mapAssessmentDoc;
     private mapResponseDoc;
     private mapResultDoc;
     private mapReportDoc;
     private mapUsageEventDoc;
     private mapConsultantSettingsDoc;
+    private mapQrSessionDoc;
 }

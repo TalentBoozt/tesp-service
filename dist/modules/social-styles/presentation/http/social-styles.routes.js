@@ -95,9 +95,40 @@ function createSocialStylesRouter(service = new social_styles_application_servic
     ];
     const superAdminOnly = [auth_middleware_1.UserRole.SUPER_ADMIN];
     // ============================================================================
-    // 1. PUBLIC RESPONDENT ENDPOINTS (/api/v1/social-styles/public/:token/*)
+    // 1. PUBLIC RESPONDENT ENDPOINTS (/api/v1/social-styles/public/*)
     //    Must be registered BEFORE /social-styles/* JWT middleware!
     // ============================================================================
+    router.get('/social-styles/public/qr-sessions/:sessionToken', exports.socialStylesPublicRateLimiter, async (req, res, next) => {
+        try {
+            res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
+            res.setHeader('Pragma', 'no-cache');
+            res.setHeader('Expires', '0');
+            const payload = await service.getPublicQrSession(req.params.sessionToken);
+            res.status(200).json(payload);
+        }
+        catch (err) {
+            res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
+            res.setHeader('Pragma', 'no-cache');
+            res.setHeader('Expires', '0');
+            next(err);
+        }
+    });
+    router.post('/social-styles/public/qr-sessions/:sessionToken/register', exports.socialStylesPublicRateLimiter, async (req, res, next) => {
+        try {
+            res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
+            res.setHeader('Pragma', 'no-cache');
+            res.setHeader('Expires', '0');
+            const body = parseWithZod(social_styles_dto_1.RegisterViaQrSessionSchema, req.body || {});
+            const payload = await service.registerParticipantViaQrSession(req.params.sessionToken, body, extractClientIp(req));
+            res.status(201).json(payload);
+        }
+        catch (err) {
+            res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
+            res.setHeader('Pragma', 'no-cache');
+            res.setHeader('Expires', '0');
+            next(err);
+        }
+    });
     router.get('/social-styles/public/:token', exports.socialStylesPublicRateLimiter, async (req, res, next) => {
         try {
             const payload = await service.getPublicQuestionnaireSession(req.params.token);
@@ -160,11 +191,69 @@ function createSocialStylesRouter(service = new social_styles_application_servic
             next(err);
         }
     });
+    router.post('/social-styles/assessments/bulk', auth_middleware_1.authenticate, authorizeSocialStylesRoles(consultantAllowedRoles), async (req, res, next) => {
+        try {
+            const body = parseWithZod(social_styles_dto_1.BulkCreateAssessmentsSchema, req.body || {});
+            const payload = await service.bulkCreateAssessments(req.user, body, extractClientIp(req));
+            res.status(201).json(payload);
+        }
+        catch (err) {
+            next(err);
+        }
+    });
     router.post('/social-styles/assessments', auth_middleware_1.authenticate, authorizeSocialStylesRoles(consultantAllowedRoles), async (req, res, next) => {
         try {
             const body = parseWithZod(social_styles_dto_1.CreateAssessmentSchema, req.body || {});
             const payload = await service.createAssessment(req.user, body, extractClientIp(req));
             res.status(201).json(payload);
+        }
+        catch (err) {
+            next(err);
+        }
+    });
+    router.get('/social-styles/qr-sessions', auth_middleware_1.authenticate, authorizeSocialStylesRoles(consultantAllowedRoles), async (req, res, next) => {
+        try {
+            const consultantId = typeof req.query.consultantId === 'string' ? req.query.consultantId.trim() : undefined;
+            const payload = await service.listQrSessions(req.user, consultantId);
+            res.status(200).json(payload);
+        }
+        catch (err) {
+            next(err);
+        }
+    });
+    router.post('/social-styles/qr-sessions', auth_middleware_1.authenticate, authorizeSocialStylesRoles(consultantAllowedRoles), async (req, res, next) => {
+        try {
+            const body = parseWithZod(social_styles_dto_1.CreateQrSessionSchema, req.body || {});
+            const payload = await service.createQrSession(req.user, body, extractClientIp(req));
+            res.status(201).json(payload);
+        }
+        catch (err) {
+            next(err);
+        }
+    });
+    router.get('/social-styles/qr-sessions/:qrSessionId', auth_middleware_1.authenticate, authorizeSocialStylesRoles(consultantAllowedRoles), async (req, res, next) => {
+        try {
+            const payload = await service.getQrSessionDetails(req.user, req.params.qrSessionId);
+            res.status(200).json(payload);
+        }
+        catch (err) {
+            next(err);
+        }
+    });
+    router.patch('/social-styles/qr-sessions/:qrSessionId', auth_middleware_1.authenticate, authorizeSocialStylesRoles(consultantAllowedRoles), async (req, res, next) => {
+        try {
+            const body = parseWithZod(social_styles_dto_1.UpdateQrSessionSchema, req.body || {});
+            const payload = await service.updateQrSession(req.user, req.params.qrSessionId, body, extractClientIp(req));
+            res.status(200).json(payload);
+        }
+        catch (err) {
+            next(err);
+        }
+    });
+    router.post('/social-styles/assessments/:id/send-invitation', auth_middleware_1.authenticate, authorizeSocialStylesRoles(consultantAllowedRoles), async (req, res, next) => {
+        try {
+            const payload = await service.sendAssessmentInvitationEmail(req.user, req.params.id, extractClientIp(req));
+            res.status(200).json(payload);
         }
         catch (err) {
             next(err);

@@ -33,7 +33,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.SocialStyleConsultantSettingsModel = exports.SocialStyleQuestionnaireModel = exports.SocialStyleUsageEventModel = exports.SocialStyleReportModel = exports.SocialStyleResultModel = exports.SocialStyleResponseModel = exports.SocialStyleAssessmentModel = void 0;
+exports.SocialStyleQrSessionModel = exports.SocialStyleConsultantSettingsModel = exports.SocialStyleQuestionnaireModel = exports.SocialStyleUsageEventModel = exports.SocialStyleReportModel = exports.SocialStyleResultModel = exports.SocialStyleResponseModel = exports.SocialStyleAssessmentModel = void 0;
 exports.deriveBillingTimeBuckets = deriveBillingTimeBuckets;
 const mongoose_1 = __importStar(require("mongoose"));
 const SocialStyleAssessmentSchema = new mongoose_1.Schema({
@@ -93,6 +93,21 @@ const SocialStyleAssessmentSchema = new mongoose_1.Schema({
         required: true,
         index: true,
     },
+    sourceChannel: {
+        type: String,
+        enum: ['MANUAL', 'BULK_IMPORT', 'QR_SELF_REGISTRATION'],
+        default: 'MANUAL',
+        index: true,
+    },
+    batchId: { type: String, default: null, index: true },
+    qrSessionId: { type: String, default: null, index: true },
+    invitationEmailStatus: {
+        type: String,
+        enum: ['NOT_SENT', 'SENT', 'FAILED'],
+        default: 'NOT_SENT',
+    },
+    invitationEmailSentAt: { type: Date, default: null },
+    invitationEmailError: { type: String, default: null, maxlength: 500 },
     publicTokenHash: { type: String },
     encryptedPublicToken: { type: String, default: null },
     tokenExpiresAt: { type: Date, default: null },
@@ -121,6 +136,7 @@ SocialStyleAssessmentSchema.index({ publicTokenHash: 1 }, { unique: true, sparse
 SocialStyleAssessmentSchema.index({ consultantId: 1, createdAt: -1 });
 SocialStyleAssessmentSchema.index({ consultantId: 1, status: 1, createdAt: -1 });
 SocialStyleAssessmentSchema.index({ consultantId: 1, participantEmail: 1 });
+SocialStyleAssessmentSchema.index({ qrSessionId: 1, participantEmail: 1 });
 SocialStyleAssessmentSchema.index({ firmId: 1, createdAt: -1 });
 SocialStyleAssessmentSchema.index({ status: 1, completedAt: -1 });
 exports.SocialStyleAssessmentModel = mongoose_1.default.models.SocialStyleAssessment ||
@@ -402,6 +418,59 @@ const SocialStyleConsultantSettingsSchema = new mongoose_1.Schema({
 });
 exports.SocialStyleConsultantSettingsModel = mongoose_1.default.models.SocialStyleConsultantSettings ||
     mongoose_1.default.model('SocialStyleConsultantSettings', SocialStyleConsultantSettingsSchema);
+const SocialStyleQrSessionSchema = new mongoose_1.Schema({
+    qrSessionId: {
+        type: String,
+        required: true,
+        unique: true,
+        match: /^SSQ-[A-Z0-9-]{6,40}$/,
+        index: true,
+    },
+    consultantId: { type: String, required: true, index: true },
+    consultantName: { type: String, required: true, trim: true, maxlength: 150 },
+    consultantEmail: { type: String, lowercase: true, trim: true, maxlength: 150 },
+    firmId: { type: String, index: true },
+    firmName: { type: String, trim: true, maxlength: 150 },
+    organizationId: { type: String, index: true },
+    organizationName: { type: String, trim: true, maxlength: 200 },
+    title: {
+        type: String,
+        default: 'Social Styles Classroom Assessment',
+        trim: true,
+        maxlength: 200,
+    },
+    reference: { type: String, trim: true, maxlength: 100 },
+    consultantNotes: { type: String, trim: true, maxlength: 5000 },
+    language: {
+        type: String,
+        enum: ['en', 'si', 'ta'],
+        default: 'en',
+        required: true,
+    },
+    assessmentLinkExpiryDays: { type: Number, default: 14, min: 1, max: 365 },
+    status: {
+        type: String,
+        enum: ['ACTIVE', 'PAUSED', 'EXPIRED', 'REVOKED'],
+        default: 'ACTIVE',
+        required: true,
+        index: true,
+    },
+    sessionTokenHash: { type: String, required: true, unique: true, index: true },
+    encryptedSessionToken: { type: String, required: true },
+    expiresAt: { type: Date, default: null },
+    maxParticipants: { type: Number, default: null, min: 1 },
+    requirePhone: { type: Boolean, default: false },
+    sendBackupEmail: { type: Boolean, default: true },
+    registeredCount: { type: Number, default: 0, min: 0 },
+    createdBy: { type: String, required: true },
+}, {
+    collection: 'social_style_qr_sessions',
+    timestamps: true,
+});
+SocialStyleQrSessionSchema.index({ consultantId: 1, createdAt: -1 });
+SocialStyleQrSessionSchema.index({ consultantId: 1, status: 1 });
+exports.SocialStyleQrSessionModel = mongoose_1.default.models.SocialStyleQrSession ||
+    mongoose_1.default.model('SocialStyleQrSession', SocialStyleQrSessionSchema);
 /**
  * Helper to derive UTC billingPeriod ('YYYY-MM'), billingQuarter ('YYYY-Q#'), and billingYear
  */

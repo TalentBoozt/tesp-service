@@ -25,6 +25,7 @@ class SocialStylesRepository {
     static sharedIdempotencyIndex = new Map(); // idempotencyKey -> eventId
     static sharedFirstExportLockIndex = new Map(); // firstExportLockKey -> eventId
     static sharedConsultantSettings = new Map();
+    static sharedQrSessions = new Map();
     static sharedInterpretationCatalog = JSON.parse(JSON.stringify(style_interpretations_definition_1.DEFAULT_INTERPRETATION_TEMPLATES_V1));
     // Fault-injection hooks for testing partial failure recovery (Section 4.1 & 9.4)
     static sharedFailNextLedgerInsertCount = 0;
@@ -52,6 +53,9 @@ class SocialStylesRepository {
     }
     get consultantSettings() {
         return SocialStylesRepository.sharedConsultantSettings;
+    }
+    get qrSessions() {
+        return SocialStylesRepository.sharedQrSessions;
     }
     get interpretationCatalog() {
         return SocialStylesRepository.sharedInterpretationCatalog;
@@ -83,6 +87,7 @@ class SocialStylesRepository {
         SocialStylesRepository.sharedIdempotencyIndex.clear();
         SocialStylesRepository.sharedFirstExportLockIndex.clear();
         SocialStylesRepository.sharedConsultantSettings.clear();
+        SocialStylesRepository.sharedQrSessions.clear();
         SocialStylesRepository.sharedInterpretationCatalog = JSON.parse(JSON.stringify(style_interpretations_definition_1.DEFAULT_INTERPRETATION_TEMPLATES_V1));
         SocialStylesRepository.sharedFailNextLedgerInsertCount = 0;
         SocialStylesRepository.sharedFailNextReportSaveCount = 0;
@@ -397,6 +402,10 @@ class SocialStylesRepository {
                 query.status = filter.status;
             if (filter.language && filter.language !== 'ALL')
                 query.language = filter.language;
+            if (filter.qrSessionId)
+                query.qrSessionId = filter.qrSessionId;
+            if (filter.batchId)
+                query.batchId = filter.batchId;
             if (filter.exportedFilter === 'EXPORTED')
                 query.reportExportCount = { $gt: 0 };
             if (filter.exportedFilter === 'NOT_EXPORTED')
@@ -410,6 +419,8 @@ class SocialStylesRepository {
                     { reference: regex },
                     { title: regex },
                     { assessmentId: regex },
+                    { qrSessionId: regex },
+                    { batchId: regex },
                 ];
             }
             const sortField = filter.sortBy || 'createdAt';
@@ -440,6 +451,12 @@ class SocialStylesRepository {
         if (filter.language && filter.language !== 'ALL') {
             items = items.filter((a) => a.language === filter.language);
         }
+        if (filter.qrSessionId) {
+            items = items.filter((a) => a.qrSessionId === filter.qrSessionId);
+        }
+        if (filter.batchId) {
+            items = items.filter((a) => a.batchId === filter.batchId);
+        }
         if (filter.exportedFilter === 'EXPORTED') {
             items = items.filter((a) => a.reportExportCount > 0);
         }
@@ -453,7 +470,9 @@ class SocialStylesRepository {
                 (a.organizationName || '').toLowerCase().includes(q) ||
                 (a.reference || '').toLowerCase().includes(q) ||
                 (a.title || '').toLowerCase().includes(q) ||
-                a.assessmentId.toLowerCase().includes(q));
+                a.assessmentId.toLowerCase().includes(q) ||
+                (a.qrSessionId || '').toLowerCase().includes(q) ||
+                (a.batchId || '').toLowerCase().includes(q));
         }
         const sortField = filter.sortBy || 'createdAt';
         const sortMult = filter.sortOrder === 'asc' ? 1 : -1;
@@ -964,6 +983,156 @@ class SocialStylesRepository {
         return { ...next };
     }
     // ==========================================================================
+    // 8. Classroom QR Cohort Sessions
+    // ==========================================================================
+    async createQrSession(record) {
+        const now = new Date();
+        const full = {
+            ...record,
+            createdAt: now,
+            updatedAt: now,
+        };
+        if (this.isMongoConnected) {
+            const doc = await social_styles_schemas_1.SocialStyleQrSessionModel.create(full);
+            return this.mapQrSessionDoc(doc);
+        }
+        if (this.qrSessions.has(full.qrSessionId)) {
+            throw new Error(`Duplicate qrSessionId: ${full.qrSessionId}`);
+        }
+        for (const existing of this.qrSessions.values()) {
+            if (existing.sessionTokenHash === full.sessionTokenHash) {
+                throw new Error('Duplicate sessionTokenHash');
+            }
+        }
+        this.qrSessions.set(full.qrSessionId, { ...full });
+        return { ...full };
+    }
+    async findQrSessionById(qrSessionId, consultantIdScope) {
+        if (this.isMongoConnected) {
+            const filter = { qrSessionId };
+            if (consultantIdScope)
+                filter.consultantId = consultantIdScope;
+            const doc = await social_styles_schemas_1.SocialStyleQrSessionModel.findOne(filter).lean();
+            return doc ? this.mapQrSessionDoc(doc) : null;
+        }
+        const item = this.qrSessions.get(qrSessionId);
+        if (!item)
+            return null;
+        if (consultantIdScope && item.consultantId !== consultantIdScope) {
+            return null;
+        }
+        return { ...item };
+    }
+    async findQrSessionByTokenHash(sessionTokenHash) {
+        if (!sessionTokenHash)
+            return null;
+        if (this.isMongoConnected) {
+            const doc = await social_styles_schemas_1.SocialStyleQrSessionModel.findOne({ sessionTokenHash }).lean();
+            return doc ? this.mapQrSessionDoc(doc) : null;
+        }
+        for (const item of this.qrSessions.values()) {
+            if (item.sessionTokenHash === sessionTokenHash) {
+                return { ...item };
+            }
+        }
+        return null;
+    }
+    async updateQrSession(qrSessionId, updates, consultantIdScope) {
+        const now = new Date();
+        if (this.isMongoConnected) {
+            const filter = { qrSessionId };
+            if (consultantIdScope)
+                filter.consultantId = consultantIdScope;
+            const doc = await social_styles_schemas_1.SocialStyleQrSessionModel.findOneAndUpdate(filter, { $set: { ...updates, updatedAt: now } }, { new: true }).lean();
+            return doc ? this.mapQrSessionDoc(doc) : null;
+        }
+        const existing = this.qrSessions.get(qrSessionId);
+        if (!existing)
+            return null;
+        if (consultantIdScope && existing.consultantId !== consultantIdScope) {
+            return null;
+        }
+        const updated = {
+            ...existing,
+            ...updates,
+            updatedAt: now,
+        };
+        this.qrSessions.set(qrSessionId, updated);
+        return { ...updated };
+    }
+    async listQrSessions(consultantIdScope) {
+        if (this.isMongoConnected) {
+            const filter = {};
+            if (consultantIdScope)
+                filter.consultantId = consultantIdScope;
+            const docs = await social_styles_schemas_1.SocialStyleQrSessionModel.find(filter)
+                .sort({ createdAt: -1 })
+                .lean();
+            return docs.map((d) => this.mapQrSessionDoc(d));
+        }
+        let items = Array.from(this.qrSessions.values());
+        if (consultantIdScope) {
+            items = items.filter((s) => s.consultantId === consultantIdScope);
+        }
+        items.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+        return items.map((s) => ({ ...s }));
+    }
+    async findAssessmentByQrSessionAndEmail(qrSessionId, participantEmail) {
+        const normalizedEmail = participantEmail.trim().toLowerCase();
+        if (this.isMongoConnected) {
+            const doc = await social_styles_schemas_1.SocialStyleAssessmentModel.findOne({
+                qrSessionId,
+                participantEmail: normalizedEmail,
+            })
+                .sort({ createdAt: -1 })
+                .lean();
+            return doc ? this.mapAssessmentDoc(doc) : null;
+        }
+        const matches = Array.from(this.assessments.values())
+            .filter((a) => a.qrSessionId === qrSessionId &&
+            a.participantEmail.toLowerCase() === normalizedEmail)
+            .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+        return matches[0] ? { ...matches[0] } : null;
+    }
+    async claimQrSessionSeatAtomic(qrSessionId) {
+        const now = new Date();
+        if (this.isMongoConnected) {
+            const sessionDoc = await social_styles_schemas_1.SocialStyleQrSessionModel.findOne({ qrSessionId }).lean();
+            if (!sessionDoc || sessionDoc.status !== 'ACTIVE')
+                return null;
+            if (sessionDoc.expiresAt && new Date(sessionDoc.expiresAt).getTime() <= now.getTime()) {
+                return null;
+            }
+            const filter = {
+                qrSessionId,
+                status: 'ACTIVE',
+            };
+            if (typeof sessionDoc.maxParticipants === 'number' && sessionDoc.maxParticipants > 0) {
+                filter.registeredCount = { $lt: sessionDoc.maxParticipants };
+            }
+            const updatedDoc = await social_styles_schemas_1.SocialStyleQrSessionModel.findOneAndUpdate(filter, {
+                $inc: { registeredCount: 1 },
+                $set: { updatedAt: now },
+            }, { new: true }).lean();
+            return updatedDoc ? this.mapQrSessionDoc(updatedDoc) : null;
+        }
+        const existing = this.qrSessions.get(qrSessionId);
+        if (!existing || existing.status !== 'ACTIVE')
+            return null;
+        if (existing.expiresAt && existing.expiresAt.getTime() <= now.getTime()) {
+            return null;
+        }
+        if (typeof existing.maxParticipants === 'number' &&
+            existing.maxParticipants > 0 &&
+            existing.registeredCount >= existing.maxParticipants) {
+            return null;
+        }
+        existing.registeredCount += 1;
+        existing.updatedAt = now;
+        this.qrSessions.set(qrSessionId, { ...existing });
+        return { ...existing };
+    }
+    // ==========================================================================
     // Mappers
     // ==========================================================================
     mapAssessmentDoc(doc) {
@@ -986,6 +1155,12 @@ class SocialStylesRepository {
             language: doc.language || 'en',
             questionnaireVersion: doc.questionnaireVersion || 'v1.0',
             status: doc.status,
+            sourceChannel: doc.sourceChannel || 'MANUAL',
+            batchId: doc.batchId || null,
+            qrSessionId: doc.qrSessionId || null,
+            invitationEmailStatus: doc.invitationEmailStatus || 'NOT_SENT',
+            invitationEmailSentAt: doc.invitationEmailSentAt ? new Date(doc.invitationEmailSentAt) : null,
+            invitationEmailError: doc.invitationEmailError || null,
             publicTokenHash: doc.publicTokenHash,
             encryptedPublicToken: doc.encryptedPublicToken,
             tokenExpiresAt: doc.tokenExpiresAt ? new Date(doc.tokenExpiresAt) : null,
@@ -1110,6 +1285,34 @@ class SocialStylesRepository {
             lifetimeReportQuota: typeof doc.lifetimeReportQuota === 'number' ? doc.lifetimeReportQuota : null,
             prepaidCreditsBalance: Number(doc.prepaidCreditsBalance || 0),
             updatedBy: doc.updatedBy,
+            createdAt: new Date(doc.createdAt || Date.now()),
+            updatedAt: new Date(doc.updatedAt || Date.now()),
+        };
+    }
+    mapQrSessionDoc(doc) {
+        return {
+            qrSessionId: doc.qrSessionId,
+            consultantId: doc.consultantId,
+            consultantName: doc.consultantName,
+            consultantEmail: doc.consultantEmail,
+            firmId: doc.firmId,
+            firmName: doc.firmName,
+            organizationId: doc.organizationId,
+            organizationName: doc.organizationName,
+            title: doc.title || 'Social Styles Classroom Assessment',
+            reference: doc.reference,
+            consultantNotes: doc.consultantNotes,
+            language: doc.language || 'en',
+            assessmentLinkExpiryDays: Number(doc.assessmentLinkExpiryDays || 14),
+            status: doc.status || 'ACTIVE',
+            sessionTokenHash: doc.sessionTokenHash,
+            encryptedSessionToken: doc.encryptedSessionToken,
+            expiresAt: doc.expiresAt ? new Date(doc.expiresAt) : null,
+            maxParticipants: typeof doc.maxParticipants === 'number' ? doc.maxParticipants : null,
+            requirePhone: Boolean(doc.requirePhone),
+            sendBackupEmail: doc.sendBackupEmail !== false,
+            registeredCount: Number(doc.registeredCount || 0),
+            createdBy: doc.createdBy,
             createdAt: new Date(doc.createdAt || Date.now()),
             updatedAt: new Date(doc.updatedAt || Date.now()),
         };

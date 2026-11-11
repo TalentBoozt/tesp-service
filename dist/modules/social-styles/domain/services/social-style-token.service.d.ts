@@ -49,6 +49,22 @@ export declare class SocialStyleTokenService {
      */
     buildPublicUrl(rawToken: string): string;
     /**
+     * Generates a compact 128-bit (16-byte, 22-char base64url) token bundle for Classroom QR Sessions
+     * so the resulting URL is short (~62 chars) and renders as a low-density, easy-to-scan QR matrix
+     * from across a classroom or lecture hall.
+     */
+    generateQrSessionTokenBundle(): {
+        rawSessionToken: string;
+        sessionTokenHash: string;
+        encryptedSessionToken: string;
+        joinUrl: string;
+    };
+    isWellFormedQrSessionToken(rawToken?: string | null): boolean;
+    hashQrSessionToken(rawToken: string): string;
+    buildQrJoinUrl(rawSessionToken: string): string;
+    reconstructQrJoinUrlFromEncrypted(encryptedSessionToken?: string | null): string | null;
+    decryptRawToken(encryptedToken?: string | null): string | null;
+    /**
      * Constant-time verification of a raw token against a stored hash and lifecycle state.
      */
     validateTokenAgainstAssessmentState(rawToken: string, assessmentState: {
