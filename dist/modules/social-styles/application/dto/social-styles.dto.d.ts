@@ -99,6 +99,8 @@ export declare const ListAssessmentsQuerySchema: z.ZodObject<{
     sortBy: z.ZodDefault<z.ZodEnum<["createdAt", "completedAt", "participantName", "status"]>>;
     sortOrder: z.ZodDefault<z.ZodEnum<["asc", "desc"]>>;
     consultantId: z.ZodOptional<z.ZodString>;
+    qrSessionId: z.ZodOptional<z.ZodString>;
+    batchId: z.ZodOptional<z.ZodString>;
 }, "strip", z.ZodTypeAny, {
     status: "DRAFT" | "COMPLETED" | "EXPIRED" | "CANCELLED" | "ALL" | "IN_PROGRESS" | "REVOKED" | "REVIEWED" | "INVITED" | "REOPENED";
     limit: number;
@@ -109,6 +111,8 @@ export declare const ListAssessmentsQuerySchema: z.ZodObject<{
     sortOrder: "asc" | "desc";
     search?: string | undefined;
     consultantId?: string | undefined;
+    batchId?: string | undefined;
+    qrSessionId?: string | undefined;
 }, {
     status?: "DRAFT" | "COMPLETED" | "EXPIRED" | "CANCELLED" | "ALL" | "IN_PROGRESS" | "REVOKED" | "REVIEWED" | "INVITED" | "REOPENED" | undefined;
     search?: string | undefined;
@@ -116,9 +120,172 @@ export declare const ListAssessmentsQuerySchema: z.ZodObject<{
     page?: number | undefined;
     consultantId?: string | undefined;
     language?: "ALL" | "en" | "si" | "ta" | undefined;
+    batchId?: string | undefined;
+    qrSessionId?: string | undefined;
     exportedFilter?: "ALL" | "EXPORTED" | "NOT_EXPORTED" | undefined;
     sortBy?: "status" | "createdAt" | "completedAt" | "participantName" | undefined;
     sortOrder?: "asc" | "desc" | undefined;
+}>;
+export declare const BulkCreateAssessmentsSchema: z.ZodObject<{
+    title: z.ZodOptional<z.ZodString>;
+    organizationName: z.ZodOptional<z.ZodString>;
+    organizationId: z.ZodOptional<z.ZodString>;
+    reference: z.ZodOptional<z.ZodString>;
+    consultantNotes: z.ZodOptional<z.ZodString>;
+    language: z.ZodDefault<z.ZodEnum<["en", "si", "ta"]>>;
+    tokenExpiresAt: z.ZodOptional<z.ZodString>;
+    sendInvitationEmails: z.ZodDefault<z.ZodBoolean>;
+    participants: z.ZodArray<z.ZodObject<{
+        participantName: z.ZodString;
+        participantEmail: z.ZodString;
+        participantPhone: z.ZodOptional<z.ZodString>;
+        organizationName: z.ZodOptional<z.ZodString>;
+        reference: z.ZodOptional<z.ZodString>;
+        consultantNotes: z.ZodOptional<z.ZodString>;
+        language: z.ZodOptional<z.ZodEnum<["en", "si", "ta"]>>;
+    }, "strip", z.ZodTypeAny, {
+        participantName: string;
+        participantEmail: string;
+        organizationName?: string | undefined;
+        consultantNotes?: string | undefined;
+        participantPhone?: string | undefined;
+        reference?: string | undefined;
+        language?: "en" | "si" | "ta" | undefined;
+    }, {
+        participantName: string;
+        participantEmail: string;
+        organizationName?: string | undefined;
+        consultantNotes?: string | undefined;
+        participantPhone?: string | undefined;
+        reference?: string | undefined;
+        language?: "en" | "si" | "ta" | undefined;
+    }>, "many">;
+}, "strip", z.ZodTypeAny, {
+    language: "en" | "si" | "ta";
+    sendInvitationEmails: boolean;
+    participants: {
+        participantName: string;
+        participantEmail: string;
+        organizationName?: string | undefined;
+        consultantNotes?: string | undefined;
+        participantPhone?: string | undefined;
+        reference?: string | undefined;
+        language?: "en" | "si" | "ta" | undefined;
+    }[];
+    organizationId?: string | undefined;
+    title?: string | undefined;
+    organizationName?: string | undefined;
+    consultantNotes?: string | undefined;
+    tokenExpiresAt?: string | undefined;
+    reference?: string | undefined;
+}, {
+    participants: {
+        participantName: string;
+        participantEmail: string;
+        organizationName?: string | undefined;
+        consultantNotes?: string | undefined;
+        participantPhone?: string | undefined;
+        reference?: string | undefined;
+        language?: "en" | "si" | "ta" | undefined;
+    }[];
+    organizationId?: string | undefined;
+    title?: string | undefined;
+    organizationName?: string | undefined;
+    consultantNotes?: string | undefined;
+    tokenExpiresAt?: string | undefined;
+    reference?: string | undefined;
+    language?: "en" | "si" | "ta" | undefined;
+    sendInvitationEmails?: boolean | undefined;
+}>;
+export declare const CreateQrSessionSchema: z.ZodObject<{
+    title: z.ZodDefault<z.ZodString>;
+    organizationName: z.ZodOptional<z.ZodString>;
+    organizationId: z.ZodOptional<z.ZodString>;
+    reference: z.ZodOptional<z.ZodString>;
+    consultantNotes: z.ZodOptional<z.ZodString>;
+    language: z.ZodDefault<z.ZodEnum<["en", "si", "ta"]>>;
+    assessmentLinkExpiryDays: z.ZodDefault<z.ZodNumber>;
+    expiresAt: z.ZodOptional<z.ZodString>;
+    maxParticipants: z.ZodOptional<z.ZodNullable<z.ZodNumber>>;
+    requirePhone: z.ZodDefault<z.ZodBoolean>;
+    sendBackupEmail: z.ZodDefault<z.ZodBoolean>;
+}, "strip", z.ZodTypeAny, {
+    title: string;
+    language: "en" | "si" | "ta";
+    assessmentLinkExpiryDays: number;
+    requirePhone: boolean;
+    sendBackupEmail: boolean;
+    expiresAt?: string | undefined;
+    organizationId?: string | undefined;
+    organizationName?: string | undefined;
+    consultantNotes?: string | undefined;
+    reference?: string | undefined;
+    maxParticipants?: number | null | undefined;
+}, {
+    expiresAt?: string | undefined;
+    organizationId?: string | undefined;
+    title?: string | undefined;
+    organizationName?: string | undefined;
+    consultantNotes?: string | undefined;
+    reference?: string | undefined;
+    language?: "en" | "si" | "ta" | undefined;
+    assessmentLinkExpiryDays?: number | undefined;
+    maxParticipants?: number | null | undefined;
+    requirePhone?: boolean | undefined;
+    sendBackupEmail?: boolean | undefined;
+}>;
+export declare const UpdateQrSessionSchema: z.ZodObject<{
+    title: z.ZodOptional<z.ZodString>;
+    organizationName: z.ZodOptional<z.ZodNullable<z.ZodString>>;
+    reference: z.ZodOptional<z.ZodNullable<z.ZodString>>;
+    consultantNotes: z.ZodOptional<z.ZodNullable<z.ZodString>>;
+    language: z.ZodOptional<z.ZodEnum<["en", "si", "ta"]>>;
+    assessmentLinkExpiryDays: z.ZodOptional<z.ZodNumber>;
+    status: z.ZodOptional<z.ZodEnum<["ACTIVE", "PAUSED", "REVOKED"]>>;
+    expiresAt: z.ZodOptional<z.ZodNullable<z.ZodString>>;
+    maxParticipants: z.ZodOptional<z.ZodNullable<z.ZodNumber>>;
+    requirePhone: z.ZodOptional<z.ZodBoolean>;
+    sendBackupEmail: z.ZodOptional<z.ZodBoolean>;
+}, "strip", z.ZodTypeAny, {
+    status?: "ACTIVE" | "PAUSED" | "REVOKED" | undefined;
+    expiresAt?: string | null | undefined;
+    title?: string | undefined;
+    organizationName?: string | null | undefined;
+    consultantNotes?: string | null | undefined;
+    reference?: string | null | undefined;
+    language?: "en" | "si" | "ta" | undefined;
+    assessmentLinkExpiryDays?: number | undefined;
+    maxParticipants?: number | null | undefined;
+    requirePhone?: boolean | undefined;
+    sendBackupEmail?: boolean | undefined;
+}, {
+    status?: "ACTIVE" | "PAUSED" | "REVOKED" | undefined;
+    expiresAt?: string | null | undefined;
+    title?: string | undefined;
+    organizationName?: string | null | undefined;
+    consultantNotes?: string | null | undefined;
+    reference?: string | null | undefined;
+    language?: "en" | "si" | "ta" | undefined;
+    assessmentLinkExpiryDays?: number | undefined;
+    maxParticipants?: number | null | undefined;
+    requirePhone?: boolean | undefined;
+    sendBackupEmail?: boolean | undefined;
+}>;
+export declare const RegisterViaQrSessionSchema: z.ZodObject<{
+    participantName: z.ZodString;
+    participantEmail: z.ZodString;
+    participantPhone: z.ZodOptional<z.ZodString>;
+    selectedLanguage: z.ZodOptional<z.ZodEnum<["en", "si", "ta"]>>;
+}, "strip", z.ZodTypeAny, {
+    participantName: string;
+    participantEmail: string;
+    participantPhone?: string | undefined;
+    selectedLanguage?: "en" | "si" | "ta" | undefined;
+}, {
+    participantName: string;
+    participantEmail: string;
+    participantPhone?: string | undefined;
+    selectedLanguage?: "en" | "si" | "ta" | undefined;
 }>;
 export declare const StartPublicAssessmentSchema: z.ZodObject<{
     language: z.ZodOptional<z.ZodEnum<["en", "si", "ta"]>>;

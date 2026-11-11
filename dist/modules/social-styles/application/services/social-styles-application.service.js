@@ -21,6 +21,7 @@ const social_style_token_service_1 = require("../../domain/services/social-style
 const social_styles_repository_1 = require("../../infrastructure/persistence/mongoose/social-styles.repository");
 const social_styles_schemas_1 = require("../../infrastructure/persistence/mongoose/social-styles.schemas");
 const social_style_pdf_generator_1 = require("../../infrastructure/generators/social-style-pdf.generator");
+const social_style_email_template_1 = require("../../infrastructure/email/social-style-email.template");
 /**
  * Core Application Service orchestrating the Social Styles Assessment bounded context.
  * Enforces RBAC, strict consultant isolation, public token security, recoverable FIRST_EXPORT_ONLY
@@ -1459,8 +1460,641 @@ class SocialStylesApplicationService {
         return { interpretationTemplates: templates };
     }
     // ==========================================================================
+    // 5. Bulk Participant Import & Automated Invitation Email Dispatch
+    // ==========================================================================
+    async bulkCreateAssessments(actor, input, clientIp = '127.0.0.1') {
+        await this.assertConsultantModuleAccess(actor);
+        const now = new Date();
+        const datePart = now.toISOString().slice(0, 10).replace(/-/g, '');
+        const batchSuffix = crypto_1.default.randomBytes(3).toString('hex').toUpperCase();
+        const batchId = `SSB-${datePart}-${batchSuffix}`;
+        let expiresAt;
+        if (input.tokenExpiresAt) {
+            expiresAt = new Date(input.tokenExpiresAt);
+            if (Number.isNaN(expiresAt.getTime()) || expiresAt.getTime() <= now.getTime()) {
+                throw new error_middleware_1.AppError(400, 'tokenExpiresAt must be a valid future timestamp.', 'https://tesp-api.talnova.io/errors/social-styles/invalid-expiry');
+            }
+        }
+        const shouldSendEmails = input.sendInvitationEmails !== undefined
+            ? input.sendInvitationEmails !== false
+            : input.sendEmailInvitations !== false;
+        const seenEmailsInPayload = new Set();
+        const results = [];
+        let createdCount = 0;
+        let skippedDuplicates = 0;
+        let emailsSent = 0;
+        let emailsFailed = 0;
+        // Create assessments & dispatch emails in controlled concurrency chunks of 10
+        const CONCURRENCY = 10;
+        for (let i = 0; i < input.participants.length; i += CONCURRENCY) {
+            const chunk = input.participants.slice(i, i + CONCURRENCY);
+            const chunkPromises = chunk.map(async (row, idx) => {
+                const rowIndex = i + idx + 1;
+                const normalizedEmail = row.participantEmail.trim().toLowerCase();
+                if (seenEmailsInPayload.has(normalizedEmail)) {
+                    skippedDuplicates += 1;
+                    return {
+                        rowIndex,
+                        participantName: row.participantName,
+                        participantEmail: normalizedEmail,
+                        participantPhone: row.participantPhone,
+                        organizationName: row.organizationName || input.organizationName,
+                        status: 'SKIPPED_DUPLICATE_IN_BATCH',
+                        emailDispatched: false,
+                    };
+                }
+                seenEmailsInPayload.add(normalizedEmail);
+                const randomSuffix = crypto_1.default.randomBytes(4).toString('hex').toUpperCase();
+                const assessmentId = `SSA-${datePart}-${randomSuffix}`;
+                const tokenBundle = this.tokenService.generateTokenBundle(expiresAt);
+                const resolvedOrgName = row.organizationName || input.organizationName;
+                const resolvedTitle = input.title || 'Social Styles Assessment';
+                const resolvedRef = row.reference || input.reference;
+                const resolvedNotes = row.consultantNotes || input.consultantNotes;
+                const resolvedLang = row.language || input.language || 'en';
+                let record = await this.repository.createAssessment({
+                    assessmentId,
+                    consultantId: actor.userId,
+                    consultantName: actor.name || actor.email || actor.userId,
+                    consultantEmail: actor.email,
+                    firmId: actor.firmId,
+                    firmName: actor.firmName,
+                    organizationId: input.organizationId,
+                    organizationName: resolvedOrgName,
+                    participantName: row.participantName.trim(),
+                    participantEmail: normalizedEmail,
+                    participantPhone: row.participantPhone?.trim() || undefined,
+                    title: resolvedTitle,
+                    reference: resolvedRef,
+                    consultantNotes: resolvedNotes,
+                    language: resolvedLang,
+                    questionnaireVersion: answer_key_v1_definition_1.CURRENT_QUESTIONNAIRE_VERSION,
+                    status: 'INVITED',
+                    sourceChannel: 'BULK_IMPORT',
+                    batchId,
+                    qrSessionId: null,
+                    invitationEmailStatus: 'NOT_SENT',
+                    invitationEmailSentAt: null,
+                    invitationEmailError: null,
+                    publicTokenHash: tokenBundle.publicTokenHash,
+                    encryptedPublicToken: tokenBundle.encryptedPublicToken,
+                    tokenExpiresAt: expiresAt || null,
+                    tokenRevokedAt: null,
+                    invitedAt: now,
+                    startedAt: null,
+                    completedAt: null,
+                    reviewedAt: null,
+                    firstBillableExportId: null,
+                    firstBillableLockState: 'NONE',
+                    firstBillableLockedAt: null,
+                    firstExportedAt: null,
+                    lastReportExportedAt: null,
+                    reportExportCount: 0,
+                    billableExportCount: 0,
+                    createdBy: actor.userId,
+                });
+                createdCount += 1;
+                let emailDispatched = false;
+                let emailProvider;
+                let emailError;
+                if (shouldSendEmails) {
+                    const dispatchRes = await (0, social_style_email_template_1.dispatchSocialStyleInvitationEmail)({
+                        projectId: input.organizationId,
+                        participantName: record.participantName,
+                        participantEmail: record.participantEmail,
+                        assessmentId: record.assessmentId,
+                        title: record.title,
+                        organizationName: record.organizationName,
+                        consultantName: record.consultantName,
+                        firmName: record.firmName,
+                        publicUrl: tokenBundle.publicUrl,
+                        tokenExpiresAt: record.tokenExpiresAt,
+                        language: record.language,
+                    });
+                    emailProvider = dispatchRes.provider;
+                    if (dispatchRes.sent) {
+                        emailDispatched = true;
+                        emailsSent += 1;
+                        const updated = await this.repository.updateAssessment(record.assessmentId, {
+                            invitationEmailStatus: 'SENT',
+                            invitationEmailSentAt: new Date(),
+                            invitationEmailError: null,
+                        });
+                        if (updated)
+                            record = updated;
+                    }
+                    else {
+                        emailsFailed += 1;
+                        emailError = dispatchRes.error || 'Email dispatch failed';
+                        const updated = await this.repository.updateAssessment(record.assessmentId, {
+                            invitationEmailStatus: 'FAILED',
+                            invitationEmailError: emailError,
+                        });
+                        if (updated)
+                            record = updated;
+                    }
+                }
+                return {
+                    rowIndex,
+                    participantName: record.participantName,
+                    participantEmail: record.participantEmail,
+                    participantPhone: record.participantPhone,
+                    organizationName: record.organizationName,
+                    status: 'CREATED',
+                    assessmentId: record.assessmentId,
+                    publicUrl: tokenBundle.publicUrl,
+                    emailDispatched,
+                    emailProvider,
+                    emailError,
+                };
+            });
+            const chunkResults = await Promise.all(chunkPromises);
+            results.push(...chunkResults);
+        }
+        await this.recordModuleAudit({
+            actorId: actor.userId,
+            actorRole: actor.role,
+            action: 'SOCIAL_STYLES_BULK_ASSESSMENTS_CREATED',
+            resourceType: 'ASSESSMENT',
+            resourceId: batchId,
+            firmId: actor.firmId,
+            organizationId: input.organizationId,
+            ipAddress: clientIp,
+            metadata: {
+                batchId,
+                totalSubmitted: input.participants.length,
+                createdCount,
+                skippedDuplicates,
+                emailsSent,
+                emailsFailed,
+            },
+        });
+        return {
+            batchId,
+            summary: {
+                totalSubmitted: input.participants.length,
+                createdCount,
+                skippedDuplicates,
+                emailsSent,
+                emailsFailed,
+            },
+            results: results.sort((a, b) => a.rowIndex - b.rowIndex),
+        };
+    }
+    async sendAssessmentInvitationEmail(actor, assessmentId, clientIp = '127.0.0.1') {
+        await this.assertConsultantModuleAccess(actor);
+        let assessment = await this.getAuthorizedAssessmentOrThrow(actor, assessmentId);
+        if (assessment.status === 'COMPLETED' || assessment.status === 'REVIEWED') {
+            throw new error_middleware_1.AppError(409, 'Cannot send an invitation email for an already completed assessment.', 'https://tesp-api.talnova.io/errors/social-styles/assessment-already-completed');
+        }
+        let publicUrl = this.tokenService.reconstructPublicUrlFromEncrypted(assessment.encryptedPublicToken);
+        // Automatically generate or regenerate public link if missing/revoked/expired
+        const isExpired = assessment.tokenExpiresAt && assessment.tokenExpiresAt.getTime() <= Date.now();
+        if (!publicUrl ||
+            !['INVITED', 'IN_PROGRESS', 'REOPENED'].includes(assessment.status) ||
+            isExpired) {
+            const generated = await this.generatePublicLink(actor, assessmentId, undefined, clientIp);
+            publicUrl = generated.publicUrl;
+            assessment = await this.getAuthorizedAssessmentOrThrow(actor, assessmentId);
+        }
+        const dispatchRes = await (0, social_style_email_template_1.dispatchSocialStyleInvitationEmail)({
+            projectId: assessment.organizationId,
+            participantName: assessment.participantName,
+            participantEmail: assessment.participantEmail,
+            assessmentId: assessment.assessmentId,
+            title: assessment.title,
+            organizationName: assessment.organizationName,
+            consultantName: assessment.consultantName,
+            firmName: assessment.firmName,
+            publicUrl: publicUrl,
+            tokenExpiresAt: assessment.tokenExpiresAt,
+            language: assessment.language,
+        });
+        const sentAt = new Date();
+        const updated = await this.repository.updateAssessment(assessmentId, {
+            invitationEmailStatus: dispatchRes.sent ? 'SENT' : 'FAILED',
+            invitationEmailSentAt: dispatchRes.sent ? sentAt : assessment.invitationEmailSentAt,
+            invitationEmailError: dispatchRes.sent
+                ? null
+                : dispatchRes.error || 'Email dispatch failed',
+        });
+        await this.recordModuleAudit({
+            actorId: actor.userId,
+            actorRole: actor.role,
+            action: dispatchRes.sent
+                ? 'SOCIAL_STYLES_INVITATION_EMAIL_SENT'
+                : 'SOCIAL_STYLES_INVITATION_EMAIL_FAILED',
+            resourceType: 'ASSESSMENT',
+            resourceId: assessmentId,
+            firmId: assessment.firmId,
+            organizationId: assessment.organizationId,
+            ipAddress: clientIp,
+            metadata: {
+                recipientEmail: assessment.participantEmail,
+                provider: dispatchRes.provider,
+                error: dispatchRes.error,
+            },
+        });
+        return {
+            assessmentId,
+            recipientEmail: assessment.participantEmail,
+            publicUrl,
+            emailDispatched: dispatchRes.sent,
+            provider: dispatchRes.provider,
+            errorMessage: dispatchRes.error,
+            invitationEmailStatus: updated?.invitationEmailStatus || (dispatchRes.sent ? 'SENT' : 'FAILED'),
+            invitationEmailSentAt: updated?.invitationEmailSentAt
+                ? updated.invitationEmailSentAt.toISOString()
+                : null,
+        };
+    }
+    // ==========================================================================
+    // 6. Classroom / Public QR Code Self-Registration ("QR Cohort Sessions")
+    // ==========================================================================
+    async createQrSession(actor, input, clientIp = '127.0.0.1') {
+        await this.assertConsultantModuleAccess(actor);
+        const now = new Date();
+        const datePart = now.toISOString().slice(0, 10).replace(/-/g, '');
+        const randomSuffix = crypto_1.default.randomBytes(3).toString('hex').toUpperCase();
+        const qrSessionId = `SSQ-${datePart}-${randomSuffix}`;
+        let expiresAt = null;
+        if (input.expiresAt) {
+            expiresAt = new Date(input.expiresAt);
+            if (Number.isNaN(expiresAt.getTime()) || expiresAt.getTime() <= now.getTime()) {
+                throw new error_middleware_1.AppError(400, 'QR session expiresAt must be a valid future timestamp.', 'https://tesp-api.talnova.io/errors/social-styles/invalid-expiry');
+            }
+        }
+        const tokenBundle = this.tokenService.generateQrSessionTokenBundle();
+        const session = await this.repository.createQrSession({
+            qrSessionId,
+            consultantId: actor.userId,
+            consultantName: actor.name || actor.email || actor.userId,
+            consultantEmail: actor.email,
+            firmId: actor.firmId,
+            firmName: actor.firmName,
+            organizationId: input.organizationId,
+            organizationName: input.organizationName,
+            title: input.title || 'Social Styles Classroom Assessment',
+            reference: input.reference,
+            consultantNotes: input.consultantNotes,
+            language: input.language || 'en',
+            sessionTokenHash: tokenBundle.sessionTokenHash,
+            encryptedSessionToken: tokenBundle.encryptedSessionToken,
+            status: 'ACTIVE',
+            expiresAt,
+            assessmentLinkExpiryDays: input.assessmentLinkExpiryDays !== undefined ? input.assessmentLinkExpiryDays : 14,
+            maxParticipants: input.maxParticipants ?? null,
+            registeredCount: 0,
+            requirePhone: input.requirePhone ?? false,
+            sendBackupEmail: input.sendBackupEmail ?? true,
+            createdBy: actor.userId,
+        });
+        await this.recordModuleAudit({
+            actorId: actor.userId,
+            actorRole: actor.role,
+            action: 'SOCIAL_STYLES_QR_SESSION_CREATED',
+            resourceType: 'QR_SESSION',
+            resourceId: session.qrSessionId,
+            firmId: session.firmId,
+            organizationId: session.organizationId,
+            ipAddress: clientIp,
+            metadata: {
+                title: session.title,
+                organizationName: session.organizationName,
+                language: session.language,
+                maxParticipants: session.maxParticipants,
+            },
+        });
+        return {
+            qrSession: this.formatQrSessionResponse(session, 0),
+        };
+    }
+    async listQrSessions(actor, requestedConsultantId) {
+        await this.assertConsultantModuleAccess(actor);
+        const consultantScope = this.resolveConsultantScope(actor, requestedConsultantId);
+        const sessions = await this.repository.listQrSessions(consultantScope);
+        // Compute completed counts for each session
+        const enriched = await Promise.all(sessions.map(async (s) => {
+            const assessments = await this.repository.listAssessments({
+                consultantId: consultantScope,
+                qrSessionId: s.qrSessionId,
+                page: 1,
+                limit: 500,
+            });
+            const completedCount = assessments.data.filter((a) => ['COMPLETED', 'REVIEWED'].includes(a.status)).length;
+            return this.formatQrSessionResponse(s, completedCount);
+        }));
+        return {
+            data: enriched,
+        };
+    }
+    async getQrSessionDetails(actor, qrSessionId) {
+        await this.assertConsultantModuleAccess(actor);
+        const consultantScope = this.isSuperAdmin(actor) ? undefined : actor.userId;
+        const session = await this.repository.findQrSessionById(qrSessionId, consultantScope);
+        if (!session) {
+            throw new error_middleware_1.AppError(404, `QR Session '${qrSessionId}' was not found or you do not have access.`, 'https://tesp-api.talnova.io/errors/social-styles/qr-session-not-found');
+        }
+        const assessments = await this.repository.listAssessments({
+            consultantId: consultantScope,
+            qrSessionId: session.qrSessionId,
+            page: 1,
+            limit: 500,
+        });
+        const completedCount = assessments.data.filter((a) => ['COMPLETED', 'REVIEWED'].includes(a.status)).length;
+        return {
+            qrSession: this.formatQrSessionResponse(session, completedCount),
+            participants: assessments.data.map((a) => {
+                const activeUrl = ['INVITED', 'IN_PROGRESS', 'REOPENED'].includes(a.status)
+                    ? this.tokenService.reconstructPublicUrlFromEncrypted(a.encryptedPublicToken)
+                    : null;
+                return this.formatConsultantAssessmentResponse(a, activeUrl);
+            }),
+        };
+    }
+    async updateQrSession(actor, qrSessionId, updates, clientIp = '127.0.0.1') {
+        await this.assertConsultantModuleAccess(actor);
+        const consultantScope = this.isSuperAdmin(actor) ? undefined : actor.userId;
+        const existing = await this.repository.findQrSessionById(qrSessionId, consultantScope);
+        if (!existing) {
+            throw new error_middleware_1.AppError(404, `QR Session '${qrSessionId}' was not found or you do not have access.`, 'https://tesp-api.talnova.io/errors/social-styles/qr-session-not-found');
+        }
+        const patch = {};
+        if (updates.title !== undefined)
+            patch.title = updates.title;
+        if (updates.organizationName !== undefined)
+            patch.organizationName = updates.organizationName || undefined;
+        if (updates.reference !== undefined)
+            patch.reference = updates.reference || undefined;
+        if (updates.consultantNotes !== undefined)
+            patch.consultantNotes = updates.consultantNotes || undefined;
+        if (updates.language !== undefined)
+            patch.language = updates.language;
+        if (updates.status !== undefined)
+            patch.status = updates.status;
+        if (updates.assessmentLinkExpiryDays !== undefined)
+            patch.assessmentLinkExpiryDays = updates.assessmentLinkExpiryDays;
+        if (updates.maxParticipants !== undefined)
+            patch.maxParticipants = updates.maxParticipants;
+        if (updates.requirePhone !== undefined)
+            patch.requirePhone = updates.requirePhone;
+        if (updates.sendBackupEmail !== undefined)
+            patch.sendBackupEmail = updates.sendBackupEmail;
+        if (updates.expiresAt !== undefined) {
+            if (updates.expiresAt === null) {
+                patch.expiresAt = null;
+            }
+            else {
+                const exp = new Date(updates.expiresAt);
+                if (Number.isNaN(exp.getTime()) || exp.getTime() <= Date.now()) {
+                    throw new error_middleware_1.AppError(400, 'expiresAt must be a future timestamp.');
+                }
+                patch.expiresAt = exp;
+            }
+        }
+        const updated = await this.repository.updateQrSession(qrSessionId, patch);
+        if (!updated) {
+            throw new error_middleware_1.AppError(404, 'QR Session not found.');
+        }
+        await this.recordModuleAudit({
+            actorId: actor.userId,
+            actorRole: actor.role,
+            action: 'SOCIAL_STYLES_QR_SESSION_UPDATED',
+            resourceType: 'QR_SESSION',
+            resourceId: qrSessionId,
+            firmId: existing.firmId,
+            organizationId: existing.organizationId,
+            ipAddress: clientIp,
+            metadata: { updatedFields: Object.keys(patch) },
+        });
+        const assessments = await this.repository.listAssessments({
+            consultantId: consultantScope,
+            qrSessionId: updated.qrSessionId,
+            page: 1,
+            limit: 500,
+        });
+        const completedCount = assessments.data.filter((a) => ['COMPLETED', 'REVIEWED'].includes(a.status)).length;
+        return {
+            qrSession: this.formatQrSessionResponse(updated, completedCount),
+        };
+    }
+    async resolveValidPublicQrSessionOrThrow(rawSessionToken, options = {}) {
+        if (!this.tokenService.isWellFormedQrSessionToken(rawSessionToken)) {
+            throw new error_middleware_1.AppError(404, 'Invalid or unrecognized QR classroom session link.', 'https://tesp-api.talnova.io/errors/social-styles/invalid-qr-session-token');
+        }
+        const sessionTokenHash = this.tokenService.hashQrSessionToken(rawSessionToken);
+        const session = await this.repository.findQrSessionByTokenHash(sessionTokenHash);
+        if (!session) {
+            throw new error_middleware_1.AppError(404, 'Invalid or unrecognized QR classroom session link.', 'https://tesp-api.talnova.io/errors/social-styles/invalid-qr-session-token');
+        }
+        if (session.status === 'PAUSED' && !options.allowPaused) {
+            throw new error_middleware_1.AppError(409, 'Registration for this classroom QR session is currently paused by the facilitator.', 'https://tesp-api.talnova.io/errors/social-styles/qr-session-paused');
+        }
+        if (session.status === 'REVOKED') {
+            throw new error_middleware_1.AppError(410, 'This classroom QR session has been closed by the facilitator.', 'https://tesp-api.talnova.io/errors/social-styles/qr-session-closed');
+        }
+        if (session.status === 'EXPIRED' ||
+            (session.expiresAt && session.expiresAt.getTime() <= Date.now())) {
+            if (session.status !== 'EXPIRED') {
+                await this.repository.updateQrSession(session.qrSessionId, { status: 'EXPIRED' });
+            }
+            throw new error_middleware_1.AppError(410, 'This classroom QR session has expired.', 'https://tesp-api.talnova.io/errors/social-styles/qr-session-expired');
+        }
+        return session;
+    }
+    async getPublicQrSession(rawSessionToken) {
+        const session = await this.resolveValidPublicQrSessionOrThrow(rawSessionToken, {
+            allowPaused: true,
+        });
+        const publicQuestionnaire = (0, questionnaire_v1_definition_1.getPublicQuestionnaireView)(questionnaire_v1_definition_1.QUESTIONNAIRE_V1_DEFINITION);
+        const isFull = session.maxParticipants !== null &&
+            session.maxParticipants !== undefined &&
+            session.registeredCount >= session.maxParticipants;
+        return {
+            qrSession: {
+                qrSessionId: session.qrSessionId,
+                title: session.title,
+                reference: session.reference || null,
+                organizationName: session.organizationName || null,
+                consultantName: session.consultantName,
+                firmName: session.firmName || 'DAASH Global',
+                defaultLanguage: session.language || 'en',
+                supportedLanguages: publicQuestionnaire.supportedLanguages,
+                requirePhone: session.requirePhone,
+                isFull,
+                maxParticipants: session.maxParticipants ?? null,
+                registeredCount: session.registeredCount,
+                expiresAt: session.expiresAt ? session.expiresAt.toISOString() : null,
+                status: session.status,
+            },
+        };
+    }
+    async registerParticipantViaQrSession(rawSessionToken, input, clientIp = '127.0.0.1') {
+        const session = await this.resolveValidPublicQrSessionOrThrow(rawSessionToken, {
+            allowPaused: false,
+        });
+        const normalizedEmail = input.participantEmail.trim().toLowerCase();
+        if (session.requirePhone && (!input.participantPhone || !input.participantPhone.trim())) {
+            throw new error_middleware_1.AppError(400, 'Phone number is required for this classroom assessment session.', 'https://tesp-api.talnova.io/errors/social-styles/phone-required');
+        }
+        // 1. Check if participant already registered under this QR session
+        const existingAssessment = await this.repository.findAssessmentByQrSessionAndEmail(session.qrSessionId, normalizedEmail);
+        if (existingAssessment) {
+            if (['COMPLETED', 'REVIEWED'].includes(existingAssessment.status)) {
+                throw new error_middleware_1.AppError(409, 'You have already completed the Social Styles questionnaire for this session.', 'https://tesp-api.talnova.io/errors/social-styles/already-completed-in-qr-session');
+            }
+            const existingRawToken = this.tokenService.decryptRawToken(existingAssessment.encryptedPublicToken);
+            if (existingRawToken &&
+                ['INVITED', 'IN_PROGRESS', 'REOPENED'].includes(existingAssessment.status)) {
+                const publicUrl = this.tokenService.buildPublicUrl(existingRawToken);
+                return {
+                    resumedExisting: true,
+                    assessmentId: existingAssessment.assessmentId,
+                    publicToken: existingRawToken,
+                    publicUrl,
+                    selectedLanguage: input.selectedLanguage || existingAssessment.language || 'en',
+                };
+            }
+        }
+        // 2. Atomically claim a seat in the QR session (enforcing maxParticipants if configured)
+        const claimedSession = await this.repository.claimQrSessionSeatAtomic(session.qrSessionId);
+        if (!claimedSession) {
+            throw new error_middleware_1.AppError(409, 'This classroom QR session has reached its maximum participant capacity.', 'https://tesp-api.talnova.io/errors/social-styles/qr-session-full');
+        }
+        // 3. Create individual SocialStyleAssessment inheriting QR session metadata
+        const now = new Date();
+        const datePart = now.toISOString().slice(0, 10).replace(/-/g, '');
+        const randomSuffix = crypto_1.default.randomBytes(4).toString('hex').toUpperCase();
+        const assessmentId = `SSA-${datePart}-${randomSuffix}`;
+        let tokenExpiresAt;
+        if (session.assessmentLinkExpiryDays !== null &&
+            session.assessmentLinkExpiryDays !== undefined &&
+            session.assessmentLinkExpiryDays > 0) {
+            tokenExpiresAt = new Date(now.getTime() + session.assessmentLinkExpiryDays * 24 * 60 * 60 * 1000);
+        }
+        const tokenBundle = this.tokenService.generateTokenBundle(tokenExpiresAt);
+        const selectedLanguage = input.selectedLanguage || session.language || 'en';
+        let record = await this.repository.createAssessment({
+            assessmentId,
+            consultantId: session.consultantId,
+            consultantName: session.consultantName,
+            consultantEmail: session.consultantEmail,
+            firmId: session.firmId,
+            firmName: session.firmName,
+            organizationId: session.organizationId,
+            organizationName: session.organizationName,
+            participantName: input.participantName.trim(),
+            participantEmail: normalizedEmail,
+            participantPhone: input.participantPhone?.trim() || undefined,
+            title: session.title,
+            reference: session.reference,
+            consultantNotes: session.consultantNotes,
+            language: selectedLanguage,
+            questionnaireVersion: answer_key_v1_definition_1.CURRENT_QUESTIONNAIRE_VERSION,
+            status: 'INVITED',
+            sourceChannel: 'QR_SELF_REGISTRATION',
+            batchId: null,
+            qrSessionId: session.qrSessionId,
+            invitationEmailStatus: 'NOT_SENT',
+            invitationEmailSentAt: null,
+            invitationEmailError: null,
+            publicTokenHash: tokenBundle.publicTokenHash,
+            encryptedPublicToken: tokenBundle.encryptedPublicToken,
+            tokenExpiresAt: tokenExpiresAt || null,
+            tokenRevokedAt: null,
+            invitedAt: now,
+            startedAt: null,
+            completedAt: null,
+            reviewedAt: null,
+            firstBillableExportId: null,
+            firstBillableLockState: 'NONE',
+            firstBillableLockedAt: null,
+            firstExportedAt: null,
+            lastReportExportedAt: null,
+            reportExportCount: 0,
+            billableExportCount: 0,
+            createdBy: `QR_SELF_REG:${session.qrSessionId}`,
+        });
+        // Optional backup email dispatch if enabled on the QR session
+        if (session.sendBackupEmail) {
+            const dispatchRes = await (0, social_style_email_template_1.dispatchSocialStyleInvitationEmail)({
+                projectId: session.organizationId,
+                participantName: record.participantName,
+                participantEmail: record.participantEmail,
+                assessmentId: record.assessmentId,
+                title: record.title,
+                organizationName: record.organizationName,
+                consultantName: record.consultantName,
+                firmName: record.firmName,
+                publicUrl: tokenBundle.publicUrl,
+                tokenExpiresAt: record.tokenExpiresAt,
+                language: record.language,
+            });
+            const updated = await this.repository.updateAssessment(record.assessmentId, {
+                invitationEmailStatus: dispatchRes.sent ? 'SENT' : 'FAILED',
+                invitationEmailSentAt: dispatchRes.sent ? new Date() : null,
+                invitationEmailError: dispatchRes.sent
+                    ? null
+                    : dispatchRes.error || 'Backup email dispatch failed',
+            });
+            if (updated)
+                record = updated;
+        }
+        await this.recordModuleAudit({
+            actorId: 'PUBLIC_RESPONDENT',
+            actorRole: 'PUBLIC_RESPONDENT',
+            action: 'SOCIAL_STYLES_QR_PARTICIPANT_REGISTERED',
+            resourceType: 'QR_SESSION',
+            resourceId: session.qrSessionId,
+            firmId: session.firmId,
+            organizationId: session.organizationId,
+            ipAddress: clientIp,
+            metadata: {
+                assessmentId: record.assessmentId,
+                participantEmail: record.participantEmail,
+                selectedLanguage,
+            },
+        });
+        return {
+            resumedExisting: false,
+            assessmentId: record.assessmentId,
+            publicToken: tokenBundle.rawToken,
+            publicUrl: tokenBundle.publicUrl,
+            selectedLanguage,
+        };
+    }
+    // ==========================================================================
     // Formatting & Audit Helpers
     // ==========================================================================
+    formatQrSessionResponse(s, completedCount = 0) {
+        const publicJoinUrl = this.tokenService.reconstructQrJoinUrlFromEncrypted(s.encryptedSessionToken);
+        return {
+            qrSessionId: s.qrSessionId,
+            consultantId: s.consultantId,
+            consultantName: s.consultantName,
+            consultantEmail: s.consultantEmail || null,
+            firmId: s.firmId || null,
+            firmName: s.firmName || null,
+            organizationId: s.organizationId || null,
+            organizationName: s.organizationName || null,
+            title: s.title,
+            reference: s.reference || null,
+            consultantNotes: s.consultantNotes || null,
+            language: s.language,
+            questionnaireVersion: answer_key_v1_definition_1.CURRENT_QUESTIONNAIRE_VERSION,
+            status: s.status,
+            publicJoinUrl,
+            expiresAt: s.expiresAt ? s.expiresAt.toISOString() : null,
+            assessmentLinkExpiryDays: s.assessmentLinkExpiryDays !== undefined ? s.assessmentLinkExpiryDays : 14,
+            maxParticipants: s.maxParticipants ?? null,
+            registeredCount: s.registeredCount,
+            completedCount,
+            requirePhone: s.requirePhone,
+            sendBackupEmail: s.sendBackupEmail,
+            createdAt: s.createdAt.toISOString(),
+            updatedAt: s.updatedAt.toISOString(),
+        };
+    }
     formatConsultantAssessmentResponse(a, publicUrl) {
         return {
             assessmentId: a.assessmentId,
@@ -1481,6 +2115,14 @@ class SocialStylesApplicationService {
             language: a.language,
             questionnaireVersion: a.questionnaireVersion,
             status: a.status,
+            sourceChannel: a.sourceChannel || 'MANUAL',
+            batchId: a.batchId || null,
+            qrSessionId: a.qrSessionId || null,
+            invitationEmailStatus: a.invitationEmailStatus || 'NOT_SENT',
+            invitationEmailSentAt: a.invitationEmailSentAt
+                ? a.invitationEmailSentAt.toISOString()
+                : null,
+            invitationEmailError: a.invitationEmailError || null,
             hasActivePublicLink: Boolean(a.publicTokenHash && ['INVITED', 'IN_PROGRESS', 'REOPENED'].includes(a.status)),
             ...(publicUrl ? { publicUrl } : {}),
             tokenExpiresAt: a.tokenExpiresAt ? a.tokenExpiresAt.toISOString() : null,

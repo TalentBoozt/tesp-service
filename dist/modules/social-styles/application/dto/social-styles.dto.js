@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.UpdateInterpretationTemplatesSchema = exports.UpdateConsultantAccessSchema = exports.ListUsageQuerySchema = exports.ExportReportSchema = exports.SubmitPublicAssessmentSchema = exports.SavePublicProgressSchema = exports.StartPublicAssessmentSchema = exports.ListAssessmentsQuerySchema = exports.ReopenAssessmentSchema = exports.GenerateLinkSchema = exports.UpdateAssessmentSchema = exports.CreateAssessmentSchema = exports.AnswerOptionEnum = exports.SupportedLanguageEnum = void 0;
+exports.UpdateInterpretationTemplatesSchema = exports.UpdateConsultantAccessSchema = exports.ListUsageQuerySchema = exports.ExportReportSchema = exports.SubmitPublicAssessmentSchema = exports.SavePublicProgressSchema = exports.StartPublicAssessmentSchema = exports.RegisterViaQrSessionSchema = exports.UpdateQrSessionSchema = exports.CreateQrSessionSchema = exports.BulkCreateAssessmentsSchema = exports.ListAssessmentsQuerySchema = exports.ReopenAssessmentSchema = exports.GenerateLinkSchema = exports.UpdateAssessmentSchema = exports.CreateAssessmentSchema = exports.AnswerOptionEnum = exports.SupportedLanguageEnum = void 0;
 const zod_1 = require("zod");
 exports.SupportedLanguageEnum = zod_1.z.enum(['en', 'si', 'ta']);
 exports.AnswerOptionEnum = zod_1.z.enum(['A', 'B', 'C', 'D']);
@@ -59,6 +59,62 @@ exports.ListAssessmentsQuerySchema = zod_1.z.object({
     sortBy: zod_1.z.enum(['createdAt', 'completedAt', 'participantName', 'status']).default('createdAt'),
     sortOrder: zod_1.z.enum(['asc', 'desc']).default('desc'),
     consultantId: zod_1.z.string().trim().optional(),
+    qrSessionId: zod_1.z.string().trim().optional(),
+    batchId: zod_1.z.string().trim().optional(),
+});
+exports.BulkCreateAssessmentsSchema = zod_1.z.object({
+    title: zod_1.z.string().trim().min(2).max(200).optional(),
+    organizationName: zod_1.z.string().trim().max(200).optional(),
+    organizationId: zod_1.z.string().trim().max(50).optional(),
+    reference: zod_1.z.string().trim().max(100).optional(),
+    consultantNotes: zod_1.z.string().trim().max(5000).optional(),
+    language: exports.SupportedLanguageEnum.default('en'),
+    tokenExpiresAt: zod_1.z.string().datetime().optional(),
+    sendInvitationEmails: zod_1.z.boolean().default(true),
+    participants: zod_1.z
+        .array(zod_1.z.object({
+        participantName: zod_1.z.string().trim().min(2, 'participantName must be at least 2 characters').max(150),
+        participantEmail: zod_1.z.string().trim().toLowerCase().email('Valid participantEmail is required').max(150),
+        participantPhone: zod_1.z.string().trim().max(30).optional(),
+        organizationName: zod_1.z.string().trim().max(200).optional(),
+        reference: zod_1.z.string().trim().max(100).optional(),
+        consultantNotes: zod_1.z.string().trim().max(5000).optional(),
+        language: exports.SupportedLanguageEnum.optional(),
+    }))
+        .min(1, 'At least 1 participant is required')
+        .max(200, 'Maximum 200 participants per bulk import batch'),
+});
+exports.CreateQrSessionSchema = zod_1.z.object({
+    title: zod_1.z.string().trim().min(2).max(200).default('Social Styles Classroom Assessment'),
+    organizationName: zod_1.z.string().trim().max(200).optional(),
+    organizationId: zod_1.z.string().trim().max(50).optional(),
+    reference: zod_1.z.string().trim().max(100).optional(),
+    consultantNotes: zod_1.z.string().trim().max(5000).optional(),
+    language: exports.SupportedLanguageEnum.default('en'),
+    assessmentLinkExpiryDays: zod_1.z.number().int().min(1).max(365).default(14),
+    expiresAt: zod_1.z.string().datetime().optional(),
+    maxParticipants: zod_1.z.number().int().min(1).max(5000).nullable().optional(),
+    requirePhone: zod_1.z.boolean().default(false),
+    sendBackupEmail: zod_1.z.boolean().default(true),
+});
+exports.UpdateQrSessionSchema = zod_1.z.object({
+    title: zod_1.z.string().trim().min(2).max(200).optional(),
+    organizationName: zod_1.z.string().trim().max(200).nullable().optional(),
+    reference: zod_1.z.string().trim().max(100).nullable().optional(),
+    consultantNotes: zod_1.z.string().trim().max(5000).nullable().optional(),
+    language: exports.SupportedLanguageEnum.optional(),
+    assessmentLinkExpiryDays: zod_1.z.number().int().min(1).max(365).optional(),
+    status: zod_1.z.enum(['ACTIVE', 'PAUSED', 'REVOKED']).optional(),
+    expiresAt: zod_1.z.string().datetime().nullable().optional(),
+    maxParticipants: zod_1.z.number().int().min(1).max(5000).nullable().optional(),
+    requirePhone: zod_1.z.boolean().optional(),
+    sendBackupEmail: zod_1.z.boolean().optional(),
+});
+exports.RegisterViaQrSessionSchema = zod_1.z.object({
+    participantName: zod_1.z.string().trim().min(2, 'Full name is required (at least 2 characters)').max(150),
+    participantEmail: zod_1.z.string().trim().toLowerCase().email('Valid email address is required').max(150),
+    participantPhone: zod_1.z.string().trim().max(30).optional(),
+    selectedLanguage: exports.SupportedLanguageEnum.optional(),
 });
 exports.StartPublicAssessmentSchema = zod_1.z.object({
     language: exports.SupportedLanguageEnum.optional(),

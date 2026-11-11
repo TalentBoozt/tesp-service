@@ -84,6 +84,51 @@ class SocialStyleTokenService {
         return `${this.baseAppUrl}/social-styles/public/${rawToken.trim()}`;
     }
     /**
+     * Generates a compact 128-bit (16-byte, 22-char base64url) token bundle for Classroom QR Sessions
+     * so the resulting URL is short (~62 chars) and renders as a low-density, easy-to-scan QR matrix
+     * from across a classroom or lecture hall.
+     */
+    generateQrSessionTokenBundle() {
+        const rawSessionToken = crypto_1.default.randomBytes(16).toString('base64url');
+        const sessionTokenHash = this.hashQrSessionToken(rawSessionToken);
+        const encryptedSessionToken = field_encryption_service_1.FieldEncryptionService.encrypt(rawSessionToken);
+        const joinUrl = this.buildQrJoinUrl(rawSessionToken);
+        return {
+            rawSessionToken,
+            sessionTokenHash,
+            encryptedSessionToken,
+            joinUrl,
+        };
+    }
+    isWellFormedQrSessionToken(rawToken) {
+        if (!rawToken || typeof rawToken !== 'string')
+            return false;
+        return /^[A-Za-z0-9_-]{16,128}$/.test(rawToken.trim());
+    }
+    hashQrSessionToken(rawToken) {
+        if (!this.isWellFormedQrSessionToken(rawToken)) {
+            throw new Error('Malformed QR session token format.');
+        }
+        return crypto_1.default.createHash('sha256').update(rawToken.trim(), 'utf8').digest('hex');
+    }
+    buildQrJoinUrl(rawSessionToken) {
+        return `${this.baseAppUrl}/social-styles/join/${rawSessionToken.trim()}`;
+    }
+    reconstructQrJoinUrlFromEncrypted(encryptedSessionToken) {
+        if (!encryptedSessionToken)
+            return null;
+        const rawToken = field_encryption_service_1.FieldEncryptionService.decrypt(encryptedSessionToken);
+        if (!rawToken || !this.isWellFormedQrSessionToken(rawToken)) {
+            return null;
+        }
+        return this.buildQrJoinUrl(rawToken);
+    }
+    decryptRawToken(encryptedToken) {
+        if (!encryptedToken)
+            return null;
+        return field_encryption_service_1.FieldEncryptionService.decrypt(encryptedToken) || null;
+    }
+    /**
      * Constant-time verification of a raw token against a stored hash and lifecycle state.
      */
     validateTokenAgainstAssessmentState(rawToken, assessmentState, now = new Date()) {

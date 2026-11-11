@@ -10,6 +10,9 @@ export type FirstBillableLockState = 'NONE' | 'PENDING_LEDGER' | 'COMMITTED';
 export type SocialStyleChargingPolicy = 'FIRST_EXPORT_ONLY' | 'EVERY_EXPORT' | 'QUOTA_CREDIT';
 export type SocialStyleUsageCategory = 'INITIAL_EXPORT' | 'RE_EXPORT' | 'RE_DOWNLOAD';
 export type NonBillableReason = 'ALREADY_BILLED_FIRST_EXPORT' | 'REDOWNLOAD_EXISTING_REPORT' | 'SUPER_ADMIN_PREVIEW' | 'FREE_QUOTA_CREDIT';
+export type SocialStyleAssessmentSourceChannel = 'MANUAL' | 'BULK_IMPORT' | 'QR_SELF_REGISTRATION';
+export type SocialStyleInvitationEmailStatus = 'NOT_SENT' | 'SENT' | 'FAILED';
+export type SocialStyleQrSessionStatus = 'ACTIVE' | 'PAUSED' | 'EXPIRED' | 'REVOKED';
 export interface ISocialStyleAssessmentDocument extends Document {
     assessmentId: string;
     consultantId: string;
@@ -29,6 +32,12 @@ export interface ISocialStyleAssessmentDocument extends Document {
     language: SupportedSocialStyleLanguage;
     questionnaireVersion: string;
     status: SocialStyleAssessmentStatus;
+    sourceChannel?: SocialStyleAssessmentSourceChannel;
+    batchId?: string | null;
+    qrSessionId?: string | null;
+    invitationEmailStatus?: SocialStyleInvitationEmailStatus;
+    invitationEmailSentAt?: Date | null;
+    invitationEmailError?: string | null;
     publicTokenHash?: string;
     encryptedPublicToken?: string | null;
     tokenExpiresAt?: Date | null;
@@ -176,6 +185,33 @@ export interface ISocialStyleConsultantSettingsDocument extends Document {
     updatedAt: Date;
 }
 export declare const SocialStyleConsultantSettingsModel: mongoose.Model<any, {}, {}, {}, any, any>;
+export interface ISocialStyleQrSessionDocument extends Document {
+    qrSessionId: string;
+    consultantId: string;
+    consultantName: string;
+    consultantEmail?: string;
+    firmId?: string;
+    firmName?: string;
+    organizationId?: string;
+    organizationName?: string;
+    title: string;
+    reference?: string;
+    consultantNotes?: string;
+    language: SupportedSocialStyleLanguage;
+    assessmentLinkExpiryDays: number;
+    status: SocialStyleQrSessionStatus;
+    sessionTokenHash: string;
+    encryptedSessionToken: string;
+    expiresAt?: Date | null;
+    maxParticipants?: number | null;
+    requirePhone: boolean;
+    sendBackupEmail: boolean;
+    registeredCount: number;
+    createdBy: string;
+    createdAt: Date;
+    updatedAt: Date;
+}
+export declare const SocialStyleQrSessionModel: mongoose.Model<any, {}, {}, {}, any, any>;
 /**
  * Helper to derive UTC billingPeriod ('YYYY-MM'), billingQuarter ('YYYY-Q#'), and billingYear
  */
